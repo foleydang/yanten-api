@@ -3,8 +3,8 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 
-const JOKES_FILE = path.join(__dirname, '../../database/wawaxiao-jokes.json');
-const ACTIONS_FILE = path.join(__dirname, '../../database/wawaxiao-actions.json');
+const JOKES_FILE = path.join(__dirname, '../../data/database/wawaxiao-jokes.json');
+const ACTIONS_FILE = path.join(__dirname, '../../data/database/wawaxiao-actions.json');
 
 function getJokes() {
   try {
