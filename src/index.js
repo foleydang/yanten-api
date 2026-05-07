@@ -4,8 +4,11 @@ const path = require('path');
 require('dotenv').config();
 
 const config = require('../config/default');
-const { initDatabase, getDb } = require('./utils/database');
+const { initDatabase, getDb, saveDatabase } = require('./utils/database');
 const { authMiddleware } = require('./middleware/auth');
+
+// 导入限流中间件
+const { apiLimiter, strictLimiter, jokeLimiter } = require('./middleware/rateLimit');
 
 // 导入路由
 const authRoutes = require('./routes/auth');
@@ -19,23 +22,37 @@ const wawaxiaoRoutes = require('./routes/wawaxiao');
 
 const app = express();
 
+// CORS 配置（生产环境限制来源）
+const corsOptions = process.env.NODE_ENV === 'production' ? {
+  origin: [
+    'https://yanten.top',
+    'https://api.yanten.top',
+    'https://servicewechat.com'  // 微信小程序域名
+  ],
+  credentials: true
+} : {};
+
+app.use(cors(corsOptions));
+
 // 中间件
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 静态文件
 app.use('/static', express.static(path.join(__dirname, '../public')));
 
+// 全局API限流
+app.use('/api/', apiLimiter);
+
 // 路由
-app.use('/api/auth', authRoutes);
-app.use('/api/family', familyRoutes);
-app.use('/api/shopping', shoppingRoutes);
-app.use('/api/todo', todoRoutes);
-app.use('/api/schedule', scheduleRoutes);
-app.use('/api/feedback', feedbackRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/wawaxiao', wawaxiaoRoutes);
+app.use('/api/auth', strictLimiter, authRoutes);  // 登录限流
+app.use('/api/family', authMiddleware, familyRoutes);
+app.use('/api/shopping', authMiddleware, shoppingRoutes);
+app.use('/api/todo', authMiddleware, todoRoutes);
+app.use('/api/schedule', authMiddleware, scheduleRoutes);
+app.use('/api/feedback', authMiddleware, feedbackRoutes);
+app.use('/api/upload', authMiddleware, uploadRoutes);
+app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);  // 笑话限流
 
 // 用户统计 API
 app.get('/api/user/stats', authMiddleware, (req, res) => {
@@ -75,20 +92,60 @@ app.get('/api/user/stats', authMiddleware, (req, res) => {
   }
 });
 
-// 健康检查
+// 增强健康检查
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: '家庭备忘录服务运行正常 ❤️' });
+  const db = getDb();
+  const uptime = process.uptime();
+  const memory = process.memoryUsage();
+  
+  res.json({
+    status: 'ok',
+    message: '家庭备忘录服务运行正常 ❤️',
+    uptime: Math.floor(uptime),
+    uptimeFormatted: formatUptime(uptime),
+    memory: {
+      used: Math.round(memory.heapUsed / 1024 / 1024) + 'MB',
+      total: Math.round(memory.heapTotal / 1024 / 1024) + 'MB'
+    },
+    database: {
+      connected: !!db,
+      size: Math.round(getDatabaseSize() / 1024) + 'KB'
+    },
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
 });
+
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return days > 0 ? `${days}天${hours}小时` : `${hours}小时${mins}分钟`;
+}
+
+function getDatabaseSize() {
+  try {
+    const stats = require('fs').statSync(process.env.DB_PATH || './data/database/main.db');
+    return stats.size;
+  } catch (e) {
+    return 0;
+  }
+}
 
 // 错误处理
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({ 
     success: false, 
-    message: err.message || '服务器错误',
+    message: process.env.NODE_ENV === 'production' ? '服务器错误' : err.message,
     error: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
+
+// 定期保存数据库（每分钟）
+setInterval(() => {
+  saveDatabase();
+}, 60000);
 
 // 初始化数据库并启动服务
 async function start() {
@@ -98,7 +155,10 @@ async function start() {
     
     app.listen(config.port, () => {
       console.log(`🚀 服务已启动: http://localhost:${config.port}`);
+      console.log(`🌍 环境: ${process.env.NODE_ENV || 'development'}`);
       console.log('💕 家庭备忘录，记录爱的每一刻');
+      console.log('📊 数据库定期保存：每分钟');
+      console.log('🔒 API限流已启用');
     });
   } catch (error) {
     console.error('启动失败:', error);

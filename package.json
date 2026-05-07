@@ -1,7 +1,7 @@
 {
   "name": "yanten-api",
   "version": "1.0.0",
-  "description": "\u7edf\u4e00\u540e\u7aef\u670d\u52a1 - \u652f\u6301\u5bb6\u5ead\u5907\u5fd8\u5f55\u3001\u54c7\u54c7\u7b11\u7b49\u591a\u4e2a\u9879\u76ee",
+  "description": "统一后端服务 - 支持家庭备忘录、哇哇笑等多个项目",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -16,6 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^6.11.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.1",
     "sql.js": "^1.14.1",
