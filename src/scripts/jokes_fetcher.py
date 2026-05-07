@@ -178,7 +178,7 @@ def generate_new_jokes(count):
         template = random.choice(templates)
         new_joke = {
             'category': template[0],
-            'title': f'{template[1]}_{i+1}',
+            'title': template[1],
             'content': template[2],
             'likes': 0,
             'neutrals': 0,
