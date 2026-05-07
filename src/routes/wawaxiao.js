@@ -20,7 +20,11 @@ function getActions() {
   try {
     return JSON.parse(fs.readFileSync(ACTIONS_FILE, 'utf8'));
   } catch (e) { 
-    const init = { likes: {}, dislikes: {}, shares: {} };
+    const init = { 
+      likes: {},      // 记录用户对每个笑话的点赞次数
+      dislikes: {},   // 记录用户对每个笑话的不喜欢次数
+      shares: {}      // 记录分享次数
+    };
     fs.writeFileSync(ACTIONS_FILE, JSON.stringify(init, null, 2));
     return init;
   }
@@ -32,13 +36,14 @@ function saveActions(data) {
 
 // GET /jokes
 router.get('/jokes', (req, res) => {
-  const { category = '全部', page = 1, limit = 20 } = req.query;
+  const { category = '全部', page = 1, limit = 20, userId } = req.query;
   let jokes = getJokes().filter(j => j.status === 'approved');
   
   if (category !== '全部') {
     jokes = jokes.filter(j => j.category === category);
   }
   
+  // 按热度排序（喜欢数-不喜欢数）
   jokes.sort((a, b) => (b.likes - b.dislikes) - (a.likes - a.dislikes));
   
   const start = (page - 1) * limit;
@@ -76,10 +81,14 @@ router.get('/jokes/:id', (req, res) => {
   res.json({ success: true, data: joke });
 });
 
-// POST /like/:id
+// POST /like/:id - 累计点赞（每次点击都+1）
 router.post('/like/:id', (req, res) => {
-  const { userId, action } = req.body;
+  const { userId } = req.body;
   const jokeId = parseInt(req.params.id);
+  
+  if (!userId) {
+    return res.json({ success: false, message: '缺少用户ID' });
+  }
   
   const jokes = getJokes();
   const joke = jokes.find(j => j.id === jokeId);
@@ -88,26 +97,11 @@ router.post('/like/:id', (req, res) => {
   const actions = getActions();
   const key = `${userId}_${jokeId}`;
   
-  if (action === 'like') {
-    // 添加喜欢
-    if (!actions.likes[key]) {
-      actions.likes[key] = true;
-      // 如果之前不喜欢，取消不喜欢
-      if (actions.dislikes[key]) {
-        delete actions.dislikes[key];
-        joke.dislikes = Math.max(0, joke.dislikes - 1);
-      }
-      joke.likes += 1;
-    }
-  } else {
-    // 取消喜欢
-    if (actions.likes[key]) {
-      delete actions.likes[key];
-      joke.likes = Math.max(0, joke.likes - 1);
-    }
-  }
+  // 累计点赞次数（每次点击都+1）
+  actions.likes[key] = (actions.likes[key] || 0) + 1;
+  joke.likes += 1;
   
-  // 更新热门标记
+  // 更新热门标记（喜欢>=20）
   joke.isHot = joke.likes >= 20;
   
   saveActions(actions);
@@ -115,15 +109,23 @@ router.post('/like/:id', (req, res) => {
   
   res.json({
     success: true,
-    data: { likes: joke.likes, dislikes: joke.dislikes },
-    message: action === 'like' ? '已喜欢' : '已取消喜欢'
+    data: { 
+      likes: joke.likes, 
+      dislikes: joke.dislikes,
+      userLikes: actions.likes[key]  // 返回用户的累计点赞次数
+    },
+    message: '已喜欢'
   });
 });
 
-// POST /dislike/:id
+// POST /dislike/:id - 累计不喜欢（每次点击都+1）
 router.post('/dislike/:id', (req, res) => {
-  const { userId, action } = req.body;
+  const { userId } = req.body;
   const jokeId = parseInt(req.params.id);
+  
+  if (!userId) {
+    return res.json({ success: false, message: '缺少用户ID' });
+  }
   
   const jokes = getJokes();
   const joke = jokes.find(j => j.id === jokeId);
@@ -132,32 +134,21 @@ router.post('/dislike/:id', (req, res) => {
   const actions = getActions();
   const key = `${userId}_${jokeId}`;
   
-  if (action === 'dislike') {
-    // 添加不喜欢
-    if (!actions.dislikes[key]) {
-      actions.dislikes[key] = true;
-      // 如果之前喜欢，取消喜欢
-      if (actions.likes[key]) {
-        delete actions.likes[key];
-        joke.likes = Math.max(0, joke.likes - 1);
-      }
-      joke.dislikes += 1;
-    }
-  } else {
-    // 取消不喜欢
-    if (actions.dislikes[key]) {
-      delete actions.dislikes[key];
-      joke.dislikes = Math.max(0, joke.dislikes - 1);
-    }
-  }
+  // 累计不喜欢次数（每次点击都+1）
+  actions.dislikes[key] = (actions.dislikes[key] || 0) + 1;
+  joke.dislikes += 1;
   
   saveActions(actions);
   saveJokes(jokes);
   
   res.json({
     success: true,
-    data: { likes: joke.likes, dislikes: joke.dislikes },
-    message: action === 'dislike' ? '已不喜欢' : '已取消不喜欢'
+    data: { 
+      likes: joke.likes, 
+      dislikes: joke.dislikes,
+      userDislikes: actions.dislikes[key]  // 返回用户的累计不喜欢次数
+    },
+    message: '已不喜欢'
   });
 });
 
@@ -179,7 +170,7 @@ router.post('/share/:id', (req, res) => {
   });
 });
 
-// POST /jokes
+// POST /jokes - 提交新笑话
 router.post('/jokes', (req, res) => {
   const { category, title, content, author } = req.body;
   
@@ -221,6 +212,40 @@ router.get('/stats', (req, res) => {
       totalLikes: jokes.reduce((sum, j) => sum + j.likes, 0),
       totalDislikes: jokes.reduce((sum, j) => sum + j.dislikes, 0),
       totalShares: jokes.reduce((sum, j) => sum + (j.shares || 0), 0)
+    }
+  });
+});
+
+// GET /user-stats/:userId - 获取用户的点赞统计
+router.get('/user-stats/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const actions = getActions();
+  
+  const userLikes = {};
+  const userDislikes = {};
+  
+  // 统计用户对所有笑话的点赞次数
+  Object.keys(actions.likes).forEach(key => {
+    if (key.startsWith(userId + '_')) {
+      const jokeId = key.split('_')[1];
+      userLikes[jokeId] = actions.likes[key];
+    }
+  });
+  
+  Object.keys(actions.dislikes).forEach(key => {
+    if (key.startsWith(userId + '_')) {
+      const jokeId = key.split('_')[1];
+      userDislikes[jokeId] = actions.dislikes[key];
+    }
+  });
+  
+  res.json({
+    success: true,
+    data: {
+      likes: userLikes,
+      dislikes: userDislikes,
+      totalLikes: Object.values(userLikes).reduce((a, b) => a + b, 0),
+      totalDislikes: Object.values(userDislikes).reduce((a, b) => a + b, 0)
     }
   });
 });
