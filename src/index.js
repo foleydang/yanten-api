@@ -7,8 +7,10 @@ const config = require('../config/default');
 const { initDatabase, getDb, saveDatabase } = require('./utils/database');
 const { authMiddleware } = require('./middleware/auth');
 
-// 导入限流中间件
+// 安全和监控中间件
 const { apiLimiter, strictLimiter, jokeLimiter } = require('./middleware/rateLimit');
+const securityHeaders = require('./middleware/securityHeaders');
+const requestLogger = require('./middleware/requestLogger');
 
 // 导入路由
 const authRoutes = require('./routes/auth');
@@ -22,12 +24,15 @@ const wawaxiaoRoutes = require('./routes/wawaxiao');
 
 const app = express();
 
+// 安全Headers
+app.use(securityHeaders);
+
 // CORS 配置（生产环境限制来源）
 const corsOptions = process.env.NODE_ENV === 'production' ? {
   origin: [
     'https://yanten.top',
     'https://api.yanten.top',
-    'https://servicewechat.com'  // 微信小程序域名
+    'https://servicewechat.com'
   ],
   credentials: true
 } : {};
@@ -38,6 +43,11 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// 请求日志（生产环境）
+if (process.env.NODE_ENV === 'production') {
+  app.use(requestLogger);
+}
+
 // 静态文件
 app.use('/static', express.static(path.join(__dirname, '../public')));
 
@@ -45,14 +55,14 @@ app.use('/static', express.static(path.join(__dirname, '../public')));
 app.use('/api/', apiLimiter);
 
 // 路由
-app.use('/api/auth', strictLimiter, authRoutes);  // 登录限流
+app.use('/api/auth', strictLimiter, authRoutes);
 app.use('/api/family', authMiddleware, familyRoutes);
 app.use('/api/shopping', authMiddleware, shoppingRoutes);
 app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
-app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);  // 笑话限流
+app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
 
 // 用户统计 API
 app.get('/api/user/stats', authMiddleware, (req, res) => {
@@ -105,13 +115,15 @@ app.get('/api/health', (req, res) => {
     uptimeFormatted: formatUptime(uptime),
     memory: {
       used: Math.round(memory.heapUsed / 1024 / 1024) + 'MB',
-      total: Math.round(memory.heapTotal / 1024 / 1024) + 'MB'
+      total: Math.round(memory.heapTotal / 1024 / 1024) + 'MB',
+      rss: Math.round(memory.rss / 1024 / 1024) + 'MB'
     },
     database: {
       connected: !!db,
       size: Math.round(getDatabaseSize() / 1024) + 'KB'
     },
     environment: process.env.NODE_ENV || 'development',
+    version: require('../package.json').version,
     timestamp: new Date().toISOString()
   });
 });
@@ -132,9 +144,19 @@ function getDatabaseSize() {
   }
 }
 
+// 404处理
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'API不存在'
+  });
+});
+
 // 错误处理
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+  
+  // 生产环境不暴露错误详情
   res.status(500).json({ 
     success: false, 
     message: process.env.NODE_ENV === 'production' ? '服务器错误' : err.message,
@@ -144,7 +166,11 @@ app.use((err, req, res, next) => {
 
 // 定期保存数据库（每分钟）
 setInterval(() => {
-  saveDatabase();
+  try {
+    saveDatabase();
+  } catch (e) {
+    console.error('数据库保存失败:', e.message);
+  }
 }, 60000);
 
 // 初始化数据库并启动服务
@@ -159,6 +185,8 @@ async function start() {
       console.log('💕 家庭备忘录，记录爱的每一刻');
       console.log('📊 数据库定期保存：每分钟');
       console.log('🔒 API限流已启用');
+      console.log('🛡️  安全Headers已启用');
+      console.log('📝 请求日志已启用（错误和慢请求）');
     });
   } catch (error) {
     console.error('启动失败:', error);
