@@ -10,7 +10,7 @@ module.exports = {
   
   // 数据库配置
   database: {
-    path: process.env.DB_PATH || './data/family-memo.db',
+    path: process.env.DB_PATH || './data/database/main.db',
   },
   
   // JWT 配置

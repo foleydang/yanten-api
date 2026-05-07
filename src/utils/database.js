@@ -27,7 +27,7 @@ async function initDatabase() {
       }
       
       // 读取并执行初始化脚本
-      const schemaPath = path.join(__dirname, '../../database/schema.sql');
+      const schemaPath = path.join(__dirname, '../../data/database/schema.sql');
       const schema = fs.readFileSync(schemaPath, 'utf-8');
       
       // 分割并执行每条 SQL 语句
