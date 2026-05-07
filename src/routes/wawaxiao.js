@@ -15,28 +15,19 @@ function saveJokes(jokes) {
   fs.writeFileSync(JOKES_FILE, JSON.stringify(jokes, null, 2));
 }
 
-function formatDate(date) {
-  if (!date) return null;
-  const d = new Date(date);
-  return d.toISOString().split('T')[0]; // YYYY-MM-DD
-}
-
-// GET /jokes - 支持按日期筛选
+// GET /jokes
 router.get('/jokes', (req, res) => {
   const { category = '全部', page = 1, limit = 20, date, recentDays } = req.query;
   let jokes = getJokes().filter(j => j.status === 'approved');
   
-  // 按分类筛选
   if (category !== '全部') {
     jokes = jokes.filter(j => j.category === category);
   }
   
-  // 按日期筛选
   if (date) {
     jokes = jokes.filter(j => j.date === date);
   }
   
-  // 最近N天的笑话
   if (recentDays) {
     const days = parseInt(recentDays);
     const today = new Date();
@@ -45,19 +36,15 @@ router.get('/jokes', (req, res) => {
     jokes = jokes.filter(j => j.date && j.date >= cutoffStr);
   }
   
-  // 计算评分并排序
   jokes = jokes.map(joke => ({
     ...joke,
     score: (joke.likes || 0) - (joke.dislikes || 0)
   }));
   
-  // 按日期和评分排序（最新的排前面）
   jokes.sort((a, b) => {
-    // 先按日期降序
     if (a.date && b.date && a.date !== b.date) {
       return b.date.localeCompare(a.date);
     }
-    // 同日期按评分降序
     return b.score - a.score;
   });
   
@@ -77,12 +64,11 @@ router.get('/jokes', (req, res) => {
   });
 });
 
-// GET /latest - 获取最新笑话（最近7天）
+// GET /latest
 router.get('/latest', (req, res) => {
   const { limit = 50 } = req.query;
   const jokes = getJokes().filter(j => j.status === 'approved');
   
-  // 最近7天
   const today = new Date();
   const cutoff = new Date(today - 7 * 24 * 60 * 60 * 1000);
   const cutoffStr = cutoff.toISOString().split('T')[0];
@@ -109,7 +95,7 @@ router.get('/latest', (req, res) => {
   });
 });
 
-// GET /today - 今日笑话
+// GET /today
 router.get('/today', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const jokes = getJokes()
@@ -130,28 +116,7 @@ router.get('/today', (req, res) => {
   });
 });
 
-// GET /dates - 获取所有日期列表
-router.get('/dates', (req, res) => {
-  const jokes = getJokes().filter(j => j.status === 'approved');
-  
-  const dates = {};
-  jokes.forEach(j => {
-    if (j.date) {
-      dates[j.date] = dates.get(j.date, 0) + 1;
-    }
-  });
-  
-  const dateList = Object.entries(dates)
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([date, count]) => ({ date, count }));
-  
-  res.json({
-    success: true,
-    data: dateList
-  });
-});
-
-// GET /hot - 热门笑话
+// GET /hot
 router.get('/hot', (req, res) => {
   let jokes = getJokes()
     .filter(j => j.status === 'approved')
@@ -187,61 +152,83 @@ router.get('/jokes/:id', (req, res) => {
   res.json({ success: true, data: joke });
 });
 
-// POST /rate/:id - 三档评价
-router.post('/rate/:id', (req, res) => {
-  const { prevRating, newRating } = req.body;
+// POST /like/:id - 累计点赞（每次点击都+1）
+router.post('/like/:id', (req, res) => {
   const jokeId = parseInt(req.params.id);
-  
-  if (!newRating || !['like', 'neutral', 'dislike', null].includes(newRating)) {
-    return res.json({ success: false, message: '评价类型无效' });
-  }
   
   const jokes = getJokes();
   const joke = jokes.find(j => j.id === jokeId);
   if (!joke) return res.json({ success: false, message: '笑话不存在' });
   
-  // 初始化统计
-  joke.likes = joke.likes || 0;
-  joke.neutrals = joke.neutrals || 0;
-  joke.dislikes = joke.dislikes || 0;
-  
-  // 减少旧评价
-  if (prevRating === 'like') joke.likes--;
-  else if (prevRating === 'neutral') joke.neutrals--;
-  else if (prevRating === 'dislike') joke.dislikes--;
-  
-  // 增加新评价
-  if (newRating === 'like') joke.likes++;
-  else if (newRating === 'neutral') joke.neutrals++;
-  else if (newRating === 'dislike') joke.dislikes++;
-  
-  // 确保不为负
-  joke.likes = Math.max(0, joke.likes);
-  joke.neutrals = Math.max(0, joke.neutrals);
-  joke.dislikes = Math.max(0, joke.dislikes);
-  
-  joke.score = joke.likes - joke.dislikes;
+  // 累计点赞，每次点击都+1
+  joke.likes = (joke.likes || 0) + 1;
+  joke.score = joke.likes - (joke.dislikes || 0);
   joke.isHot = joke.score >= 10;
   
   saveJokes(jokes);
-  
-  const messages = {
-    'like': '已喜欢 👍',
-    'neutral': '评价为平 😐',
-    'dislike': '已不喜欢 👎',
-    null: '取消评价'
-  };
   
   res.json({
     success: true,
     data: {
       likes: joke.likes,
-      neutrals: joke.neutrals,
-      dislikes: joke.dislikes,
-      score: joke.score,
-      date: joke.date
+      neutrals: joke.neutrals || 0,
+      dislikes: joke.dislikes || 0,
+      score: joke.score
     },
-    message: messages[newRating] || '评价成功'
+    message: '喜欢+1'
+  });
+});
+
+// POST /neutral/:id - 累计评价为平（每次点击都+1）
+router.post('/neutral/:id', (req, res) => {
+  const jokeId = parseInt(req.params.id);
+  
+  const jokes = getJokes();
+  const joke = jokes.find(j => j.id === jokeId);
+  if (!joke) return res.json({ success: false, message: '笑话不存在' });
+  
+  // 累计评价，每次点击都+1
+  joke.neutrals = (joke.neutrals || 0) + 1;
+  joke.score = (joke.likes || 0) - (joke.dislikes || 0);
+  
+  saveJokes(jokes);
+  
+  res.json({
+    success: true,
+    data: {
+      likes: joke.likes || 0,
+      neutrals: joke.neutrals,
+      dislikes: joke.dislikes || 0,
+      score: joke.score
+    },
+    message: '平+1'
+  });
+});
+
+// POST /dislike/:id - 累计不喜欢（每次点击都+1）
+router.post('/dislike/:id', (req, res) => {
+  const jokeId = parseInt(req.params.id);
+  
+  const jokes = getJokes();
+  const joke = jokes.find(j => j.id === jokeId);
+  if (!joke) return res.json({ success: false, message: '笑话不存在' });
+  
+  // 累计不喜欢，每次点击都+1
+  joke.dislikes = (joke.dislikes || 0) + 1;
+  joke.score = (joke.likes || 0) - joke.dislikes;
+  joke.isHot = joke.score >= 10;
+  
+  saveJokes(jokes);
+  
+  res.json({
+    success: true,
+    data: {
+      likes: joke.likes || 0,
+      neutrals: joke.neutrals || 0,
+      dislikes: joke.dislikes,
+      score: joke.score
+    },
+    message: '不喜欢+1'
   });
 });
 
@@ -253,11 +240,9 @@ router.get('/stats', (req, res) => {
   const totalNeutrals = jokes.reduce((sum, j) => sum + (j.neutrals || 0), 0);
   const totalDislikes = jokes.reduce((sum, j) => sum + (j.dislikes || 0), 0);
   
-  // 获取最新日期
   const dates = jokes.filter(j => j.date).map(j => j.date).sort();
   const latestDate = dates.length > 0 ? dates[dates.length - 1] : null;
   
-  // 今日笑话数
   const today = new Date().toISOString().split('T')[0];
   const todayCount = jokes.filter(j => j.date === today).length;
   
