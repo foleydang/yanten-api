@@ -4,15 +4,16 @@
     "category": "职场",
     "title": "程序员面试",
     "content": "面试官：你期望薪资是多少？\n程序员：3万。\n面试官：我们公司可以给你5万，还有期权，年终奖6个月，免费三餐，带薪休假。\n程序员：真的吗？\n面试官：假的，是你先跟我开玩笑的。",
-    "likes": 5,
+    "likes": 6,
     "isHot": false,
     "status": "approved",
     "createdAt": 1778058616375,
-    "dislikes": 0,
+    "dislikes": 1,
     "shares": 0,
     "images": [],
     "date": "2026-05-06",
-    "score": 5
+    "score": 5,
+    "neutrals": 2
   },
   {
     "category": "生活",
