@@ -124,7 +124,7 @@ router.get('/hot', (req, res) => {
       ...joke,
       score: (joke.likes || 0) - (joke.dislikes || 0)
     }))
-    .filter(j => j.score >= 10)
+    .filter(j => j.score >= 0).slice(0, 5)
     .sort((a, b) => b.score - a.score);
   
   res.json({ success: true, data: jokes });
@@ -261,3 +261,4 @@ router.get('/stats', (req, res) => {
 });
 
 module.exports = router;
+
