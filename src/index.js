@@ -16,6 +16,7 @@ const todoRoutes = require('./routes/todo');
 const scheduleRoutes = require('./routes/schedule');
 const feedbackRoutes = require('./routes/feedback');
 const uploadRoutes = require('./routes/upload');
+const adminRoutes = require("./routes/admin");
 const wawaxiaoRoutes = require('./routes/wawaxiao');
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
+app.use('/api/admin/jokes', adminRoutes);
 app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
 
 // 用户统计

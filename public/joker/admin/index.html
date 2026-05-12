@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笑话管理 - 哇哇笑</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-500: #6b7280;
+            --gray-700: #374151;
+            --gray-900: #111827;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); padding: 24px; min-height: 100vh; color: var(--gray-700); }
+        .container { max-width: 1400px; margin: auto; }
+        
+        /* 头部 */
+        .header { margin-bottom: 24px; }
+        .header h1 { font-size: 28px; color: var(--gray-900); display: flex; align-items: center; gap: 12px; }
+        .header h1 span { font-size: 32px; }
+        
+        /* 统计卡片 */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--card); padding: 20px 24px; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; }
+        .stat-card .info h3 { color: var(--gray-500); font-size: 13px; font-weight: 500; }
+        .stat-card .info .num { font-size: 36px; font-weight: 700; color: var(--gray-900); margin-top: 4px; }
+        .stat-card .icon { font-size: 40px; opacity: 0.8; }
+        .stat-card.primary .num { color: var(--primary); }
+        .stat-card.success .num { color: var(--success); }
+        .stat-card.warning .num { color: var(--warning); }
+        .stat-card.danger .num { color: var(--danger); }
+        
+        /* 筛选区域 */
+        .filters { background: var(--card); padding: 20px 24px; border-radius: var(--radius); margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .filters-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .filters select, .filters input { padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 14px; background: #fff; min-width: 140px; }
+        .filters select:focus, .filters input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .filters input { width: 200px; }
+        
+        /* 按钮 - 大按钮样式 */
+        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-secondary { background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); }
+        .btn-secondary:hover { background: var(--gray-200); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #dc2626; transform: translateY(-1px); }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-sm { padding: 8px 16px; font-size: 13px; border-radius: 8px; }
+        
+        /* 表格 */
+        .table-wrap { background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 16px 20px; text-align: left; }
+        th { background: var(--gray-100); color: var(--gray-500); font-weight: 600; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid var(--gray-200); }
+        td { border-bottom: 1px solid var(--gray-100); font-size: 14px; }
+        tr:hover td { background: #fafafa; }
+        
+        .col-check { width: 40px; }
+        .col-id { width: 80px; font-weight: 600; color: var(--gray-500); }
+        .col-cat { width: 100px; }
+        .col-title { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+        .col-content { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-500); }
+        .col-likes { width: 80px; text-align: center; }
+        .col-status { width: 90px; }
+        .col-date { width: 130px; color: var(--gray-500); }
+        .col-actions { width: 240px; }
+        
+        /* 状态标签 */
+        .tag { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .tag-approved { background: #dcfce7; color: #166534; }
+        .tag-pending { background: #fef3c7; color: #92400e; }
+        .tag-rejected { background: #fee2e2; color: #991b1b; }
+        
+        /* 操作按钮组 */
+        .actions { display: flex; gap: 12px; }
+        .actions .btn-sm { min-width: 70px; justify-content: center; }
+        
+        /* 分页 */
+        .pagination { display: flex; justify-content: center; gap: 8px; padding: 24px; background: var(--card); border-top: 1px solid var(--gray-100); }
+        .pagination button { padding: 10px 16px; border: 1px solid var(--gray-200); background: #fff; border-radius: 8px; cursor: pointer; font-size: 14px; min-width: 44px; transition: all 0.15s; }
+        .pagination button:hover:not(.active):not(:disabled) { background: var(--gray-100); }
+        .pagination button.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* 弹窗 - 美化 */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-box { background: var(--card); border-radius: 20px; max-width: 640px; width: 100%; max-height: 85vh; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.25); }
+        .modal-head { padding: 24px 28px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center; }
+        .modal-head h2 { font-size: 20px; color: var(--gray-900); font-weight: 700; }
+        .modal-close { width: 36px; height: 36px; border-radius: 10px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 18px; color: var(--gray-500); }
+        .modal-close:hover { background: var(--gray-200); color: var(--gray-700); }
+        .modal-body { padding: 28px; overflow-y: auto; max-height: 60vh; }
+        .modal-foot { padding: 20px 28px; border-top: 1px solid var(--gray-100); display: flex; gap: 12px; justify-content: flex-end; background: var(--gray-100); }
+        
+        /* 详情页样式 */
+        .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .detail-item { background: var(--gray-100); padding: 16px 20px; border-radius: 12px; }
+        .detail-item.full { grid-column: span 2; }
+        .detail-item h4 { color: var(--gray-500); font-size: 12px; font-weight: 500; margin-bottom: 8px; }
+        .detail-item .value { color: var(--gray-900); font-size: 16px; font-weight: 600; }
+        .detail-item .value.status { display: inline-block; }
+        .detail-content { background: var(--gray-100); padding: 20px; border-radius: 12px; margin-top: 8px; }
+        .detail-content h4 { color: var(--gray-500); font-size: 12px; font-weight: 500; margin-bottom: 12px; }
+        .detail-content .text { color: var(--gray-700); font-size: 15px; line-height: 1.8; white-space: pre-wrap; }
+        
+        /* 编辑表单 */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; color: var(--gray-700); font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 14px 18px; border: 2px solid var(--gray-200); border-radius: 12px; font-size: 15px; background: #fff; transition: all 0.15s; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px rgba(99,102,241,0.1); }
+        .form-group textarea { height: 150px; resize: vertical; line-height: 1.6; }
+        
+        /* Toast */
+        .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); padding: 16px 32px; background: var(--gray-900); color: #fff; border-radius: 12px; z-index: 9999; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        
+        /* 复选框 */
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+        
+        /* 空状态 */
+        .empty { text-align: center; padding: 48px; }
+        .empty-icon { font-size: 56px; opacity: 0.5; }
+        .empty-text { color: var(--gray-500); margin-top: 12px; }
+        
+        @media (max-width: 768px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .table-wrap { overflow-x: auto; }
+            table { min-width: 750px; }
+            .detail-grid { grid-template-columns: 1fr; }
+            .detail-item.full { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1><span>😄</span> 哇哇笑管理</h1></div>
+        <div class="stats" id="stats"></div>
+        <div class="filters">
+            <div class="filters-row">
+                <select id="cat"><option value="">全分类</option></select>
+                <select id="status"><option value="">全状态</option><option value="approved">已通过</option><option value="pending">待审核</option><option value="rejected">已拒绝</option></select>
+                <input type="text" id="search" placeholder="搜索...">
+                <button class="btn btn-primary" onclick="load(1)">筛选</button>
+                <button class="btn btn-secondary" onclick="reset()">重置</button>
+                <button class="btn btn-danger" id="batchBtn" style="display:none" onclick="batchDel()">批量删除 (<span id="cnt">0</span>)</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr>
+                    <th class="col-check"><input type="checkbox" id="allCb" onchange="toggleAll()"></th>
+                    <th class="col-id">ID</th>
+                    <th class="col-cat">分类</th>
+                    <th class="col-title">标题</th>
+                    <th class="col-content">内容</th>
+                    <th class="col-likes">点赞</th>
+                    <th class="col-status">状态</th>
+                    <th class="col-date">日期</th>
+                    <th class="col-actions">操作</th>
+                </tr></thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+        <div class="pagination" id="page"></div>
+    </div>
+    
+    <!-- 查看弹窗 -->
+    <div class="modal" id="viewM">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2 id="viewH">笑话详情</h2>
+                <div class="modal-close" onclick="closeM('viewM')">✕</div>
+            </div>
+            <div class="modal-body" id="viewB"></div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" onclick="closeM('viewM')">关闭</button>
+                <button class="btn btn-primary" onclick="closeM('viewM');edit(curId)">编辑</button>
+                <button class="btn btn-danger" onclick="closeM('viewM');del(curId)">删除</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑弹窗 -->
+    <div class="modal" id="editM">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2 id="editH">编辑笑话</h2>
+                <div class="modal-close" onclick="closeM('editM')">✕</div>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="eid">
+                <div class="form-group"><label>标题</label><input type="text" id="etitle"></div>
+                <div class="form-group"><label>分类</label><select id="ecat"></select></div>
+                <div class="form-group"><label>内容</label><textarea id="econtent"></textarea></div>
+                <div class="form-group"><label>状态</label><select id="estatus"><option value="approved">已通过</option><option value="pending">待审核</option><option value="rejected">已拒绝</option></select></div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-secondary" onclick="closeM('editM')">取消</button>
+                <button class="btn btn-success" onclick="save()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast" style="display:none"></div>
+
+    <script>
+        const API = '/api/admin/jokes';
+        let list = [], curId = null, selected = new Set(), page = 1, size = 30, total = 0;
+        
+        async function init() {
+            await stats();
+            await cats();
+            await load(1);
+        }
+        
+        async function stats() {
+            try {
+                let r = await fetch(API + '/stats');
+                let d = await r.json();
+                if (d.s && d.d) {
+                    let icons = ['📊', '✅', '⏳', '❌'];
+                    let cls = ['primary', 'success', 'warning', 'danger'];
+                    document.getElementById('stats').innerHTML = d.d.map((c, i) => 
+                        '<div class="stat-card ' + cls[i] + '"><div class="info"><h3>' + c.category + '</h3><div class="num">' + c.count + '</div></div><div class="icon">' + icons[i] + '</div></div>'
+                    ).join('');
+                }
+            } catch (e) {}
+        }
+        
+        async function cats() {
+            try {
+                let r = await fetch(API + '/categories');
+                let d = await r.json();
+                if (d.s && d.d) {
+                    let s1 = document.getElementById('cat');
+                    let s2 = document.getElementById('ecat');
+                    d.d.forEach(c => {
+                        s1.innerHTML += '<option value="' + c.category + '">' + c.category + ' (' + c.count + ')</option>';
+                        s2.innerHTML += '<option value="' + c.category + '">' + c.category + '</option>';
+                    });
+                }
+            } catch (e) {}
+        }
+        
+        async function load(p) {
+            page = p;
+            let q = '?page=' + page + '&limit=' + size + '&category=' + document.getElementById('cat').value + '&status=' + document.getElementById('status').value + '&search=' + encodeURIComponent(document.getElementById('search').value);
+            try {
+                let r = await fetch(API + q);
+                let d = await r.json();
+                if (d.s && d.d) {
+                    list = d.d.list || [];
+                    total = d.d.total || 0;
+                    render();
+                    renderPages();
+                    selected.clear();
+                    upd();
+                } else { showError(); }
+            } catch (e) { showError(); }
+        }
+        
+        function render() {
+            let b = document.getElementById('tbody');
+            if (!list.length) {
+                b.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">📭</div><div class="empty-text">暂无数据</div></div></td></tr>';
+                return;
+            }
+            b.innerHTML = list.map(j => 
+                '<tr>' +
+                '<td class="col-check"><input type="checkbox" onchange="toggle(' + j.id + ')" ' + (selected.has(j.id) ? 'checked' : '') + '></td>' +
+                '<td class="col-id">' + j.id + '</td>' +
+                '<td class="col-cat">' + j.category + '</td>' +
+                '<td class="col-title">' + esc(j.title) + '</td>' +
+                '<td class="col-content">' + esc(j.content.substring(0, 50)) + '...</td>' +
+                '<td class="col-likes">' + (j.likes || 0) + '</td>' +
+                '<td class="col-status"><span class="tag tag-' + j.status + '">' + getStatusText(j.status) + '</span></td>' +
+                '<td class="col-date">' + (j.date || '-') + '</td>' +
+                '<td class="col-actions"><div class="actions">' +
+                    '<button class="btn btn-sm btn-secondary" onclick="view(' + j.id + ')">查看</button>' +
+                    '<button class="btn btn-sm btn-primary" onclick="edit(' + j.id + ')">编辑</button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="del(' + j.id + ')">删除</button>' +
+                '</div></td></tr>'
+            ).join('');
+        }
+        
+        function getStatusText(s) {
+            return s === 'approved' ? '通过' : s === 'pending' ? '待审' : '拒绝';
+        }
+        
+        function renderPages() {
+            let tp = Math.ceil(total / size);
+            let h = '';
+            if (tp > 1) {
+                h += '<button onclick="load(1)" ' + (page === 1 ? 'disabled' : '') + '>首页</button>';
+                h += '<button onclick="load(' + (page - 1) + ')" ' + (page === 1 ? 'disabled' : '') + '>←</button>';
+                for (let i = Math.max(1, page - 2); i <= Math.min(tp, page + 2); i++) {
+                    h += '<button onclick="load(' + i + ')" class="' + (i === page ? 'active' : '') + '">' + i + '</button>';
+                }
+                h += '<button onclick="load(' + (page + 1) + ')" ' + (page === tp ? 'disabled' : '') + '>→</button>';
+                h += '<button onclick="load(' + tp + ')" ' + (page === tp ? 'disabled' : '') + '>末页</button>';
+            }
+            document.getElementById('page').innerHTML = h;
+        }
+        
+        function showError() {
+            document.getElementById('tbody').innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败</div></div></td></tr>';
+        }
+        
+        function reset() {
+            document.getElementById('cat').value = '';
+            document.getElementById('status').value = '';
+            document.getElementById('search').value = '';
+            load(1);
+        }
+        
+        function toggleAll() {
+            let c = document.getElementById('allCb').checked;
+            list.forEach(j => c ? selected.add(j.id) : selected.delete(j.id));
+            render();
+            upd();
+        }
+        
+        function toggle(id) {
+            selected.has(id) ? selected.delete(id) : selected.add(id);
+            upd();
+        }
+        
+        function upd() {
+            document.getElementById('batchBtn').style.display = selected.size ? 'inline-flex' : 'none';
+            document.getElementById('cnt').textContent = selected.size;
+        }
+        
+        function view(id) {
+            let j = list.find(x => x.id == id);
+            if (!j) return;
+            curId = id;
+            document.getElementById('viewH').textContent = '#' + j.id + ' ' + j.title;
+            document.getElementById('viewB').innerHTML = 
+                '<div class="detail-grid">' +
+                '<div class="detail-item"><h4>分类</h4><div class="value">' + j.category + '</div></div>' +
+                '<div class="detail-item"><h4>点赞</h4><div class="value">' + (j.likes || 0) + '</div></div>' +
+                '<div class="detail-item"><h4>状态</h4><div class="value status"><span class="tag tag-' + j.status + '">' + getStatusText(j.status) + '</span></div></div>' +
+                '<div class="detail-item"><h4>日期</h4><div class="value">' + (j.date || '-') + '</div></div>' +
+                '</div>' +
+                '<div class="detail-content"><h4>内容</h4><div class="text">' + esc(j.content) + '</div></div>';
+            document.getElementById('viewM').classList.add('active');
+        }
+        
+        function edit(id) {
+            let j = list.find(x => x.id == id);
+            if (!j) return;
+            document.getElementById('eid').value = j.id;
+            document.getElementById('etitle').value = j.title;
+            document.getElementById('ecat').value = j.category;
+            document.getElementById('econtent').value = j.content;
+            document.getElementById('estatus').value = j.status;
+            document.getElementById('editH').textContent = '编辑 #' + j.id;
+            document.getElementById('editM').classList.add('active');
+        }
+        
+        async function save() {
+            let id = document.getElementById('eid').value;
+            let t = document.getElementById('etitle').value.trim();
+            let c = document.getElementById('ecat').value;
+            let x = document.getElementById('econtent').value.trim();
+            let s = document.getElementById('estatus').value;
+            if (!t || !x) { toast('标题和内容必填', 'error'); return; }
+            try {
+                let r = await fetch(API + '/' + id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({title: t, category: c, content: x, status: s})
+                });
+                let d = await r.json();
+                if (d.s) {
+                    toast('保存成功 ✓', 'success');
+                    closeM('editM');
+                    load(page);
+                    stats();
+                } else { toast(d.m || '失败', 'error'); }
+            } catch (e) { toast('网络错误', 'error'); }
+        }
+        
+        async function del(id) {
+            if (!confirm('确定删除？')) return;
+            try {
+                let r = await fetch(API + '/' + id, {method: 'DELETE'});
+                let d = await r.json();
+                if (d.s) {
+                    toast('已删除', 'success');
+                    load(page);
+                    stats();
+                } else { toast(d.m || '失败', 'error'); }
+            } catch (e) { toast('网络错误', 'error'); }
+        }
+        
+        async function batchDel() {
+            if (!selected.size || !confirm('删除 ' + selected.size + ' 条？')) return;
+            try {
+                let r = await fetch(API + '/batch', {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ids: Array.from(selected)})
+                });
+                let d = await r.json();
+                if (d.s) {
+                    toast('删除成功', 'success');
+                    selected.clear();
+                    load(page);
+                    stats();
+                } else { toast(d.m || '失败', 'error'); }
+            } catch (e) { toast('网络错误', 'error'); }
+        }
+        
+        function closeM(m) { document.getElementById(m).classList.remove('active'); }
+        
+        function toast(msg, type) {
+            let t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + (type || '');
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2500);
+        }
+        
+        function esc(s) {
+            return !s ? '' : s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        
+        init();
+    </script>
+</body>
+</html>
