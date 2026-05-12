@@ -23,72 +23,61 @@ function saveDB() {
     }
 }
 
-// 统计接口
+// 统计
 router.get('/stats', async (req, res) => {
     try {
         const database = await getDB();
-        const result = database.exec(`
-            SELECT '总数' as category, COUNT(*) as count FROM jokes
-            UNION ALL SELECT '已通过', COUNT(*) FROM jokes WHERE status='approved'
-            UNION ALL SELECT '待审核', COUNT(*) FROM jokes WHERE status='pending'
-            UNION ALL SELECT '已拒绝', COUNT(*) FROM jokes WHERE status='rejected'
-        `);
-        const stats = result[0]?.values.map(r => ({category: r[0], count: r[1]})) || [];
-        res.json({s: true, d: stats});
+        const r = database.exec("SELECT '总数',COUNT(*) FROM jokes UNION ALL SELECT '已审核',COUNT(*) WHERE status='approved' UNION ALL SELECT '待审核',COUNT(*) WHERE status='pending'");
+        res.json({s: true, d: r[0]?.values.map(x => ({category: x[0], count: x[1]})) || []});
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
-// 分类统计
-router.get('/categories', async (req, res) => {
-    try {
-        const database = await getDB();
-        const result = database.exec('SELECT category, COUNT(*) as count FROM jokes GROUP BY category ORDER BY count DESC');
-        const cats = result[0]?.values.map(r => ({category: r[0], count: r[1]})) || [];
-        res.json({s: true, d: cats});
-    } catch (e) { res.json({s: false, m: e.message}); }
-});
-
-// 列表接口
+// 列表
 router.get('/', async (req, res) => {
     try {
         const database = await getDB();
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 30;
-        const category = req.query.category || '';
         const status = req.query.status || '';
         const search = req.query.search || '';
         const offset = (page - 1) * limit;
         
         let where = 'WHERE 1=1';
-        if (category) where += ` AND category='${category.replace(/'/g,"''")}'`;
-        if (status) where += ` AND status='${status.replace(/'/g,"''")}'`;
-        if (search) where += ` AND (title LIKE '%${search.replace(/'/g,"''")}%' OR content LIKE '%${search.replace(/'/g,"''")}%')`;
+        if (status) where += ` AND status='${status}'`;
+        if (search) where += ` AND (title LIKE '%${search}%' OR content LIKE '%${search}%')`;
         
         const totalR = database.exec(`SELECT COUNT(*) FROM jokes ${where}`);
         const total = totalR[0]?.values[0]?.[0] || 0;
         
-        const listR = database.exec(`SELECT id,category,title,content,likes,neutrals,dislikes,shares,is_hot,status,date,created_at FROM jokes ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
-        const list = listR[0]?.values.map(r => ({
-            id: r[0], category: r[1], title: r[2], content: r[3],
-            likes: r[4], neutrals: r[5], dislikes: r[6], shares: r[7],
-            is_hot: r[8], status: r[9], date: r[10], created_at: r[11]
-        })) || [];
-        
-        res.json({s: true, d: {list, total, page, limit}});
+        const listR = database.exec(`SELECT id,title,content,status FROM jokes ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+        res.json({s: true, d: {list: listR[0]?.values.map(r => ({id: r[0], title: r[1], content: r[2], status: r[3]})) || [], total}});
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
-// 更新
+// 更新（通过审核或编辑内容）
 router.put('/:id', async (req, res) => {
     try {
         const database = await getDB();
         const id = parseInt(req.params.id);
-        const {title, category, content, status} = req.body;
-        if (!title || !content) return res.json({s: false, m: '标题和内容必填'});
+        const {title, content, status} = req.body;
         
-        database.exec(`UPDATE jokes SET title='${title.replace(/'/g,"''")}',category='${category.replace(/'/g,"''")}',content='${content.replace(/'/g,"''")}',status='${status}' WHERE id=${id}`);
-        saveDB();
-        res.json({s: true});
+        // 如果只传status，只更新状态
+        if (status && !title && !content) {
+            database.exec(`UPDATE jokes SET status='${status}' WHERE id=${id}`);
+            saveDB();
+            return res.json({s: true});
+        }
+        
+        // 如果传了title和content，更新内容并设为已审核
+        if (title && content) {
+            const safeTitle = title.replace(/'/g, "''");
+            const safeContent = content.replace(/'/g, "''");
+            database.exec(`UPDATE jokes SET title='${safeTitle}', content='${safeContent}', status='approved' WHERE id=${id}`);
+            saveDB();
+            return res.json({s: true});
+        }
+        
+        res.json({s: false, m: '参数错误'});
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
