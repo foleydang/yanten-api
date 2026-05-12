@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哇哇笑 - 快乐每一天</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        
+        .header { text-align: center; padding: 40px 20px; }
+        .header h1 { font-size: 48px; color: #fff; margin-bottom: 10px; }
+        .header p { color: rgba(255,255,255,0.8); font-size: 18px; }
+        
+        .stats { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; }
+        .stat { background: rgba(255,255,255,0.2); padding: 15px 30px; border-radius: 10px; color: #fff; }
+        .stat strong { font-size: 24px; }
+        
+        .tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+        .tab { background: rgba(255,255,255,0.2); color: #fff; padding: 10px 20px; border-radius: 20px; cursor: pointer; border: none; font-size: 14px; }
+        .tab.active { background: #fff; color: #667eea; }
+        
+        .joke-card { background: #fff; padding: 30px; margin-bottom: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .joke-title { font-size: 20px; color: #333; margin-bottom: 15px; font-weight: 600; }
+        .joke-content { font-size: 16px; color: #555; line-height: 1.8; white-space: pre-wrap; }
+        .joke-meta { margin-top: 15px; display: flex; justify-content: space-between; color: #999; font-size: 12px; }
+        .joke-category { background: #f0f0f0; padding: 5px 15px; border-radius: 10px; }
+        
+        .loading { text-align: center; color: #fff; padding: 50px; font-size: 18px; }
+        .empty { text-align: center; color: rgba(255,255,255,0.8); padding: 50px; }
+        
+        .load-more { display: block; width: 100%; padding: 15px; background: rgba(255,255,255,0.2); color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; margin-top: 20px; }
+        .load-more:hover { background: rgba(255,255,255,0.3); }
+        
+        .footer { text-align: center; color: rgba(255,255,255,0.6); padding: 30px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>😄 哇哇笑</h1>
+            <p>快乐每一天，笑口常开</p>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat"><strong id="total">358</strong> 条笑话</div>
+        </div>
+        
+        <div class="tabs" id="tabs">
+            <button class="tab active" data-cat="">全部</button>
+        </div>
+        
+        <div id="jokes"></div>
+        <div class="loading" id="loading">加载中...</div>
+        <button class="load-more" id="loadMore" style="display:none">加载更多</button>
+        
+        <div class="footer">
+            © 2026 哇哇笑 - 让生活充满欢笑
+        </div>
+    </div>
+
+    <script>
+        const API = '/api/wawaxiao/jokes';
+        let page = 1, category = '', loading = false;
+        
+        async function init() {
+            try {
+                const res = await fetch(API);
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('total').textContent = data.data.total;
+                    
+                    // 渲染分类
+                    const cats = data.data.categories || [];
+                    const tabs = document.getElementById('tabs');
+                    cats.forEach(c => {
+                        if (c !== '全部') {
+                            tabs.innerHTML += `<button class="tab" data-cat="${c}">${c}</button>`;
+                        }
+                    });
+                    
+                    // 绑定分类点击
+                    tabs.querySelectorAll('.tab').forEach(t => {
+                        t.onclick = () => {
+                            tabs.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+                            t.classList.add('active');
+                            category = t.dataset.cat;
+                            page = 1;
+                            loadJokes(true);
+                        };
+                    });
+                    
+                    loadJokes(true);
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').innerHTML = '加载失败，请刷新重试';
+            }
+        }
+        
+        async function loadJokes(clear = false) {
+            if (loading) return;
+            loading = true;
+            
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const url = `${API}?page=${page}&limit=10&category=${encodeURIComponent(category)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                if (data.success) {
+                    const jokes = data.data.list || [];
+                    
+                    if (clear) {
+                        document.getElementById('jokes').innerHTML = '';
+                    }
+                    
+                    if (jokes.length === 0 && clear) {
+                        document.getElementById('jokes').innerHTML = '<div class="empty">暂无笑话</div>';
+                    } else {
+                        jokes.forEach(j => {
+                            document.getElementById('jokes').innerHTML += `
+                                <div class="joke-card">
+                                    <div class="joke-title">${escapeHtml(j.title)}</div>
+                                    <div class="joke-content">${escapeHtml(j.content)}</div>
+                                    <div class="joke-meta">
+                                        <span class="joke-category">${j.category || '搞笑'}</span>
+                                        <span>#${j.id}</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    document.getElementById('loadMore').style.display = jokes.length >= 10 ? 'block' : 'none';
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            
+            loading = false;
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        document.getElementById('loadMore').onclick = () => {
+            page++;
+            loadJokes();
+        };
+        
+        function escapeHtml(s) {
+            if (!s) return '';
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        
+        init();
+    </script>
+</body>
+</html>
