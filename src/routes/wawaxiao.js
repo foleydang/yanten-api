@@ -3,7 +3,6 @@ const router = express.Router();
 const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
-const cache = require('../utils/cache');
 
 const DB_FILE = path.join(__dirname, '../../data/database/main.db');
 
@@ -14,20 +13,11 @@ async function loadDB() {
   return new SQL.Database(buffer);
 }
 
-// 获取缓存笑话
-async function getCachedJokes(key, fetchFn) {
-  const cached = cache.get(key);
-  if (cached) return cached;
-  const result = await fetchFn();
-  cache.set(key, result);
-  return result;
-}
-
 // 查询笑话列表
 router.get('/jokes', async (req, res) => {
   try {
-    const db = await loadDB();  // 每次重新加载数据库
-    const { category, page = 1, limit = 20, date } = req.query;
+    const db = await loadDB();
+    const { category, page = 1, limit = 20 } = req.query;
     
     // 获取总数
     const totalResult = db.exec('SELECT COUNT(*) as total FROM jokes WHERE status = "approved"');
@@ -72,10 +62,41 @@ router.get('/jokes', async (req, res) => {
   }
 });
 
-// 清除缓存
-router.post('/clear-cache', async (req, res) => {
-  cache.clear();
-  res.json({ success: true, message: '缓存已清除' });
+// 获取单条笑话详情（小程序点击进入详情页使用）
+router.get('/jokes/:id', async (req, res) => {
+  try {
+    const db = await loadDB();
+    const id = parseInt(req.params.id);
+    
+    if (!id || id < 1) {
+      return res.json({ success: false, message: '无效的笑话ID' });
+    }
+    
+    // 查询笑话详情
+    const result = db.exec(`SELECT id, title, content, category, likes, shares, date FROM jokes WHERE id = ${id} AND status = "approved"`);
+    
+    if (!result[0] || result[0].values.length === 0) {
+      return res.json({ success: false, message: '笑话不存在' });
+    }
+    
+    const row = result[0].values[0];
+    const joke = {
+      id: row[0],
+      title: row[1],
+      content: row[2],
+      category: row[3] || '搞笑',
+      likes: row[4] || 0,
+      shares: row[5] || 0,
+      date: row[6] || ''
+    };
+    
+    res.json({
+      success: true,
+      data: joke
+    });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
 });
 
 module.exports = router;
