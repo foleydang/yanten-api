@@ -32,43 +32,52 @@ router.get('/stats', async (req, res) => {
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
+// 分类统计
+router.get('/categories', async (req, res) => {
+    try {
+        const database = await getDB();
+        const r = database.exec("SELECT category, COUNT(*) FROM jokes GROUP BY category ORDER BY COUNT(*) DESC");
+        res.json({s: true, d: r[0]?.values.map(x => ({category: x[0], count: x[1]})) || []});
+    } catch (e) { res.json({s: false, m: e.message}); }
+});
+
 // 列表
 router.get('/', async (req, res) => {
     try {
         const database = await getDB();
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 30;
+        const category = req.query.category || '';
         const status = req.query.status || '';
         const search = req.query.search || '';
         const offset = (page - 1) * limit;
         
         let where = 'WHERE 1=1';
-        if (status) where += ` AND status='${status}'`;
-        if (search) where += ` AND (title LIKE '%${search}%' OR content LIKE '%${search}%')`;
+        if (category) where += ` AND category='${category.replace(/'/g,"''")}'`;
+        if (status) where += ` AND status='${status.replace(/'/g,"''")}'`;
+        if (search) where += ` AND (title LIKE '%${search.replace(/'/g,"''")}%' OR content LIKE '%${search.replace(/'/g,"''")}%')`;
         
         const totalR = database.exec(`SELECT COUNT(*) FROM jokes ${where}`);
         const total = totalR[0]?.values[0]?.[0] || 0;
         
-        const listR = database.exec(`SELECT id,title,content,status FROM jokes ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
-        res.json({s: true, d: {list: listR[0]?.values.map(r => ({id: r[0], title: r[1], content: r[2], status: r[3]})) || [], total}});
+        const listR = database.exec(`SELECT id,category,title,content,status FROM jokes ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+        res.json({s: true, d: {list: listR[0]?.values.map(r => ({id: r[0], category: r[1], title: r[2], content: r[3], status: r[4]})) || [], total}});
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
-// 更新（通过审核或编辑内容）
+// 更新
 router.put('/:id', async (req, res) => {
     try {
         const database = await getDB();
         const id = parseInt(req.params.id);
         const {title, content, status} = req.body;
         
-        // 如果只传status，只更新状态
         if (status && !title && !content) {
             database.exec(`UPDATE jokes SET status='${status}' WHERE id=${id}`);
             saveDB();
             return res.json({s: true});
         }
         
-        // 如果传了title和content，更新内容并设为已审核
         if (title && content) {
             const safeTitle = title.replace(/'/g, "''");
             const safeContent = content.replace(/'/g, "''");
@@ -81,7 +90,7 @@ router.put('/:id', async (req, res) => {
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
-// 删除单条
+// 删除
 router.delete('/:id', async (req, res) => {
     try {
         const database = await getDB();

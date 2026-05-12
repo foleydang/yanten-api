@@ -33,8 +33,8 @@
         .stat-card.warning .num { color: #f59e0b; }
         
         .filters { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .filters select { padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 14px; }
-        .filters input { padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: 8px; width: 200px; }
+        .filters select, .filters input { padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 14px; min-width: 120px; }
+        .filters input { width: 200px; }
         .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; font-weight: 600; }
         .btn-primary { background: var(--primary); color: #fff; }
         .btn-success { background: var(--success); color: #fff; }
@@ -49,27 +49,29 @@
         tr:hover { background: #fafafa; }
         
         .col-id { width: 60px; }
+        .col-cat { width: 80px; }
         .col-title { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-        .col-content { max-width: 250px; overflow: hidden; text-overflow: ellipsis; color: var(--gray-500); }
+        .col-content { max-width: 300px; overflow: hidden; text-overflow: ellipsis; color: var(--gray-500); }
         .col-status { width: 100px; }
-        .col-actions { width: 200px; }
+        .col-actions { width: 220px; }
         
         .tag { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .tag-approved { background: #dcfce7; color: #166534; }
         .tag-pending { background: #fef3c7; color: #92400e; }
         
-        .actions { display: flex; gap: 12px; }
+        .actions { display: flex; gap: 10px; }
         
         .pagination { display: flex; justify-content: center; gap: 8px; padding: 20px; }
         .pagination button { padding: 10px 16px; border: 1px solid var(--gray-200); background: #fff; border-radius: 8px; cursor: pointer; }
         .pagination button.active { background: var(--primary); color: #fff; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
         
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
         .modal.active { display: flex; }
         .modal-box { background: var(--card); border-radius: 20px; max-width: 640px; width: 100%; max-height: 85vh; overflow: hidden; }
         .modal-head { padding: 24px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center; }
         .modal-head h2 { font-size: 20px; }
-        .modal-close { width: 36px; height: 36px; border-radius: 10px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .modal-close { width: 36px; height: 36px; border-radius: 10px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
         .modal-body { padding: 24px; max-height: 60vh; overflow-y: auto; }
         .modal-foot { padding: 20px; border-top: 1px solid var(--gray-100); display: flex; gap: 12px; justify-content: flex-end; }
         
@@ -81,7 +83,7 @@
         
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; color: var(--gray-700); font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 14px; border: 2px solid var(--gray-200); border-radius: 12px; font-size: 15px; }
+        .form-group input, .form-group textarea { width: 100%; padding: 14px; border: 2px solid var(--gray-200); border-radius: 12px; font-size: 15px; }
         .form-group textarea { height: 150px; resize: vertical; }
         
         .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); padding: 16px 32px; background: var(--gray-900); color: #fff; border-radius: 12px; z-index: 9999; }
@@ -89,6 +91,7 @@
         .toast.error { background: var(--danger); }
         
         input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); }
+        .empty { padding: 40px; text-align: center; color: var(--gray-500); }
     </style>
 </head>
 <body>
@@ -96,12 +99,9 @@
         <div class="header"><h1><span>😄</span> 哇哇笑笑话审核</h1></div>
         <div class="stats" id="stats"></div>
         <div class="filters">
-            <select id="status">
-                <option value="pending">待审核</option>
-                <option value="approved">已审核</option>
-                <option value="">全部</option>
-            </select>
-            <input type="text" id="search" placeholder="搜索内容...">
+            <select id="cat"><option value="">全分类</option></select>
+            <select id="status"><option value="">全状态</option><option value="approved">已审核</option><option value="pending">待审核</option></select>
+            <input type="text" id="search" placeholder="搜索...">
             <button class="btn btn-primary" onclick="load(1)">筛选</button>
             <button class="btn btn-secondary" onclick="reset()">重置</button>
             <button class="btn btn-danger" id="batchBtn" style="display:none" onclick="batchDel()">批量删除 (<span id="cnt">0</span>)</button>
@@ -111,6 +111,7 @@
                 <thead><tr>
                     <th><input type="checkbox" id="allCb" onchange="toggleAll()"></th>
                     <th class="col-id">ID</th>
+                    <th class="col-cat">分类</th>
                     <th class="col-title">标题</th>
                     <th class="col-content">内容</th>
                     <th class="col-status">状态</th>
@@ -122,13 +123,9 @@
         <div class="pagination" id="page"></div>
     </div>
     
-    <!-- 查看弹窗 -->
     <div class="modal" id="viewM">
         <div class="modal-box">
-            <div class="modal-head">
-                <h2 id="viewH">笑话详情</h2>
-                <div class="modal-close" onclick="closeM('viewM')">✕</div>
-            </div>
+            <div class="modal-head"><h2 id="viewH">详情</h2><div class="modal-close" onclick="closeM('viewM')">✕</div></div>
             <div class="modal-body" id="viewB"></div>
             <div class="modal-foot">
                 <button class="btn btn-secondary" onclick="closeM('viewM')">关闭</button>
@@ -139,13 +136,9 @@
         </div>
     </div>
     
-    <!-- 编辑弹窗 -->
     <div class="modal" id="editM">
         <div class="modal-box">
-            <div class="modal-head">
-                <h2>编辑笑话</h2>
-                <div class="modal-close" onclick="closeM('editM')">✕</div>
-            </div>
+            <div class="modal-head"><h2>编辑</h2><div class="modal-close" onclick="closeM('editM')">✕</div></div>
             <div class="modal-body">
                 <input type="hidden" id="eid">
                 <div class="form-group"><label>标题</label><input type="text" id="etitle"></div>
@@ -166,47 +159,76 @@
         
         async function init() {
             await stats();
+            await cats();
             await load(1);
         }
         
         async function stats() {
-            let r = await fetch(API + '/stats');
-            let d = await r.json();
-            if (d.s && d.d) {
-                document.getElementById('stats').innerHTML = 
-                    '<div class="stat-card primary"><h3>总数</h3><div class="num">' + d.d[0].count + '</div></div>' +
-                    '<div class="stat-card success"><h3>已审核</h3><div class="num">' + d.d[1].count + '</div></div>' +
-                    '<div class="stat-card warning"><h3>待审核</h3><div class="num">' + d.d[2].count + '</div></div>';
-            }
+            try {
+                let r = await fetch(API + '/stats');
+                let d = await r.json();
+                if (d.s && d.d) {
+                    document.getElementById('stats').innerHTML = 
+                        '<div class="stat-card primary"><h3>总数</h3><div class="num">' + d.d[0].count + '</div></div>' +
+                        '<div class="stat-card success"><h3>已审核</h3><div class="num">' + d.d[1].count + '</div></div>' +
+                        '<div class="stat-card warning"><h3>待审核</h3><div class="num">' + d.d[2].count + '</div></div>';
+                }
+            } catch(e) { console.error('stats error', e); }
+        }
+        
+        async function cats() {
+            try {
+                let r = await fetch(API + '/categories');
+                let d = await r.json();
+                if (d.s && d.d) {
+                    let sel = document.getElementById('cat');
+                    d.d.forEach(c => {
+                        sel.innerHTML += '<option value="' + c.category + '">' + c.category + ' (' + c.count + ')</option>';
+                    });
+                }
+            } catch(e) { console.error('cats error', e); }
         }
         
         async function load(p) {
             page = p;
-            let q = '?page=' + page + '&limit=' + size + '&status=' + document.getElementById('status').value + '&search=' + encodeURIComponent(document.getElementById('search').value);
-            let r = await fetch(API + q);
-            let d = await r.json();
-            if (d.s && d.d) {
-                list = d.d.list || [];
-                total = d.d.total || 0;
-                render();
-                renderPages();
-                selected.clear();
-                upd();
+            let cat = document.getElementById('cat').value;
+            let st = document.getElementById('status').value;
+            let se = document.getElementById('search').value;
+            let q = '?page=' + page + '&limit=' + size + '&category=' + encodeURIComponent(cat) + '&status=' + encodeURIComponent(st) + '&search=' + encodeURIComponent(se);
+            
+            try {
+                let r = await fetch(API + q);
+                let d = await r.json();
+                console.log('load result', d);
+                if (d.s && d.d) {
+                    list = d.d.list || [];
+                    total = d.d.total || 0;
+                    render();
+                    renderPages();
+                    selected.clear();
+                    upd();
+                } else {
+                    document.getElementById('tbody').innerHTML = '<tr><td colspan="7"><div class="empty">加载失败</div></td></tr>';
+                }
+            } catch(e) {
+                console.error('load error', e);
+                document.getElementById('tbody').innerHTML = '<tr><td colspan="7"><div class="empty">网络错误</div></td></tr>';
             }
         }
         
         function render() {
             let b = document.getElementById('tbody');
             if (!list.length) {
-                b.innerHTML = '<tr><td colspan="6" style="padding:40px;text-align:center;color:#6b7280">暂无数据</td></tr>';
+                b.innerHTML = '<tr><td colspan="7"><div class="empty">暂无数据</div></td></tr>';
                 return;
             }
             b.innerHTML = list.map(j => 
                 '<tr>' +
                 '<td><input type="checkbox" onchange="toggle(' + j.id + ')"></td>' +
                 '<td>' + j.id + '</td>' +
+                '<td>' + (j.category || '搞笑') + '</td>' +
                 '<td>' + esc(j.title) + '</td>' +
-                '<td>' + esc(j.content.substring(0, 80)) + '...</td>' +
+                '<td>' + esc(j.content ? j.content.substring(0, 80) : '') + '...</td>' +
                 '<td><span class="tag tag-' + j.status + '">' + (j.status === 'approved' ? '已审核' : '待审核') + '</span></td>' +
                 '<td><div class="actions">' +
                     '<button class="btn btn-secondary" onclick="view(' + j.id + ')">查看</button>' +
@@ -220,15 +242,20 @@
             let tp = Math.ceil(total / size);
             let h = '';
             if (tp > 1) {
-                if (page > 1) h += '<button onclick="load(1)">首页</button><button onclick="load(' + (page-1) + ')">上一页</button>';
-                for (let i = Math.max(1, page-2); i <= Math.min(tp, page+2); i++) h += '<button onclick="load(' + i + ')" class="' + (i===page?'active':'') + '">' + i + '</button>';
-                if (page < tp) h += '<button onclick="load(' + (page+1) + ')">下一页</button><button onclick="load(' + tp + ')">末页</button>';
+                h += '<button onclick="load(1)" ' + (page===1?'disabled':'') + '>首页</button>';
+                h += '<button onclick="load(' + (page-1) + ')" ' + (page===1?'disabled':'') + '>上一页</button>';
+                for (let i = Math.max(1, page-2); i <= Math.min(tp, page+2); i++) {
+                    h += '<button onclick="load(' + i + ')" class="' + (i===page?'active':'') + '">' + i + '</button>';
+                }
+                h += '<button onclick="load(' + (page+1) + ')" ' + (page===tp?'disabled':'') + '>下一页</button>';
+                h += '<button onclick="load(' + tp + ')" ' + (page===tp?'disabled':'') + '>末页</button>';
             }
             document.getElementById('page').innerHTML = h;
         }
         
         function reset() {
-            document.getElementById('status').value = 'pending';
+            document.getElementById('cat').value = '';
+            document.getElementById('status').value = '';
             document.getElementById('search').value = '';
             load(1);
         }
@@ -254,20 +281,22 @@
             let j = list.find(x => x.id == id);
             if (!j) return;
             curId = id;
-            document.getElementById('viewH').textContent = '#' + j.id + ' ' + j.title;
+            document.getElementById('viewH').textContent = '#' + j.id;
             document.getElementById('viewB').innerHTML = 
+                '<div class="detail-item"><h4>分类</h4><div class="value">' + (j.category || '搞笑') + '</div></div>' +
+                '<div class="detail-item"><h4>标题</h4><div class="value">' + esc(j.title) + '</div></div>' +
                 '<div class="detail-item"><h4>状态</h4><div class="value"><span class="tag tag-' + j.status + '">' + (j.status === 'approved' ? '已审核' : '待审核') + '</span></div></div>' +
-                '<div class="detail-content"><h4 style="color:#6b7280;font-size:12px;margin-bottom:12px">内容</h4><div class="text">' + esc(j.content) + '</div></div>';
+                '<div class="detail-content"><h4>内容</h4><div class="text">' + esc(j.content || '') + '</div></div>';
             document.getElementById('viewM').classList.add('active');
         }
         
         function edit(id) {
+            closeM('viewM');
             let j = list.find(x => x.id == id);
             if (!j) return;
             document.getElementById('eid').value = j.id;
-            document.getElementById('etitle').value = j.title;
-            document.getElementById('econtent').value = j.content;
-            closeM('viewM');
+            document.getElementById('etitle').value = j.title || '';
+            document.getElementById('econtent').value = j.content || '';
             document.getElementById('editM').classList.add('active');
         }
         
@@ -284,7 +313,7 @@
                     load(page);
                     stats();
                 } else { toast(d.m || '失败', 'error'); }
-            } catch (e) { toast('网络错误', 'error'); }
+            } catch(e) { toast('网络错误', 'error'); }
         }
         
         function approveFromView() {
@@ -296,7 +325,7 @@
             let id = document.getElementById('eid').value;
             let t = document.getElementById('etitle').value.trim();
             let x = document.getElementById('econtent').value.trim();
-            if (!t || !x) { toast('标题和内容必填', 'error'); return; }
+            if (!t || !x) { toast('必填', 'error'); return; }
             
             try {
                 let r = await fetch(API + '/' + id, {
@@ -311,7 +340,7 @@
                     load(page);
                     stats();
                 } else { toast(d.m || '失败', 'error'); }
-            } catch (e) { toast('网络错误', 'error'); }
+            } catch(e) { toast('网络错误', 'error'); }
         }
         
         async function del(id) {
@@ -324,7 +353,7 @@
                     load(page);
                     stats();
                 } else { toast(d.m || '失败', 'error'); }
-            } catch (e) { toast('网络错误', 'error'); }
+            } catch(e) { toast('网络错误', 'error'); }
         }
         
         function delFromView() {
@@ -347,7 +376,7 @@
                     load(page);
                     stats();
                 } else { toast(d.m || '失败', 'error'); }
-            } catch (e) { toast('网络错误', 'error'); }
+            } catch(e) { toast('网络错误', 'error'); }
         }
         
         function closeM(m) { document.getElementById(m).classList.remove('active'); }
