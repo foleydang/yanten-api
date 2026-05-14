@@ -252,7 +252,6 @@ router.get('/categories', (req, res) => {
       { id: 'daily', name: '🧴 日用品', icon: '🧴' },
       { id: 'clothing', name: '👕 服饰', icon: '👕' },
       { id: 'medicine', name: '💊 医药', icon: '💊' },
-      { id: 'fresh', name: '🥬 生鲜', icon: '🥬' },
       { id: 'other', name: '📦 其他', icon: '📦' }
     ]
   });
