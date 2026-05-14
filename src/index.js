@@ -42,7 +42,7 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth', strictLimiter, authRoutes);
 app.use('/api/family', authMiddleware, familyRoutes);
 // 购物清单API（shopping.js 中有分类公开访问路由）
-app.use('/api/shopping', authMiddleware, shoppingRoutes);
+app.use('/api/shopping', shoppingRoutes);  // shopping.js中按需添加认证
 app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
