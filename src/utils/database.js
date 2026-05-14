@@ -104,7 +104,7 @@ function getDb() {
         },
         run: (...params) => {
           try {
-            db.run(sql, params);
+            db.run(sql, [params]);
             saveDatabase();
             // 获取最后插入的 ID
             const idResult = db.exec("SELECT last_insert_rowid()");
