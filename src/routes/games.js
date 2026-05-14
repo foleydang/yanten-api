@@ -90,6 +90,8 @@ router.post('/rank/:gameId', async (req, res) => {
       success: true,
       data: {
         score,
+        nickname: nickname,
+        avatar: avatar,  // 返回 avatar 信息
         rank: rankResult?.rank || 1,
         message: '成绩已提交'
       }
