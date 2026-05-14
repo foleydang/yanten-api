@@ -18,7 +18,10 @@ router.get('/list', authMiddleware, (req, res) => {
   
   try {
     let sql = `
-      SELECT s.*, u.nickname as created_by_name
+      SELECT s.id, s.family_id, s.title, s.description, s.schedule_date, 
+             s.schedule_time, s.start_time, s.end_time, s.type, s.remind_before, 
+             s.repeat_type, s.recurring, s.recurring_end, s.created_by, s.created_at,
+             u.nickname as created_by_name
       FROM schedules s
       LEFT JOIN users u ON s.created_by = u.id
       WHERE s.family_id = ?
