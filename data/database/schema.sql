@@ -113,3 +113,18 @@ CREATE INDEX IF NOT EXISTS idx_schedule_date ON schedules(schedule_date);
 CREATE INDEX IF NOT EXISTS idx_family_members ON family_members(family_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
+
+-- 小游戏排行榜表
+CREATE TABLE IF NOT EXISTS game_ranks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    nickname TEXT DEFAULT '玩家',
+    openid TEXT,
+    avatar TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 游戏排行榜索引
+CREATE INDEX IF NOT EXISTS idx_game_ranks_game ON game_ranks(game_id);
+CREATE INDEX IF NOT EXISTS idx_game_ranks_score ON game_ranks(game_id, score DESC);

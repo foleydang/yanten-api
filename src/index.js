@@ -18,6 +18,7 @@ const feedbackRoutes = require('./routes/feedback');
 const uploadRoutes = require('./routes/upload');
 const adminRoutes = require("./routes/admin");
 const wawaxiaoRoutes = require('./routes/wawaxiao');
+const gamesRoutes = require('./routes/games');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use('/api/feedback', authMiddleware, feedbackRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
 app.use('/api/admin/jokes', adminRoutes);
 app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
+app.use('/api/games', gamesRoutes);
 
 // 用户统计
 app.get('/api/user/stats', authMiddleware, (req, res) => {
