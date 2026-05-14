@@ -41,21 +41,8 @@ app.use('/api/', apiLimiter);
 // 路由
 app.use('/api/auth', strictLimiter, authRoutes);
 app.use('/api/family', authMiddleware, familyRoutes);
-// 购物清单API：其他需要认证
-// 购物分类公开访问
-app.get('/api/shopping/categories', (req, res) => {
-  res.json({
-    success: true,
-    data: [
-      { id: 'food', name: '🥬 食品', icon: '🥬' },
-      { id: 'daily', name: '🧴 日用品', icon: '🧴' },
-      { id: 'clothing', name: '👕 服饰', icon: '👕' },
-      { id: 'medicine', name: '💊 医药', icon: '💊' },
-      { id: 'other', name: '📦 其他', icon: '📦' }
-    ]
-  });
-});
-// 购物其他API需要认证
+// 购物清单API（shopping.js 中有分类公开访问路由）
+app.use('/api/shopping', authMiddleware, shoppingRoutes);
 app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
