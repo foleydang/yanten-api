@@ -128,3 +128,16 @@ CREATE TABLE IF NOT EXISTS game_ranks (
 -- 游戏排行榜索引
 CREATE INDEX IF NOT EXISTS idx_game_ranks_game ON game_ranks(game_id);
 CREATE INDEX IF NOT EXISTS idx_game_ranks_score ON game_ranks(game_id, score DESC);
+
+-- 用户表
+CREATE TABLE IF NOT EXISTS users (
+    openid TEXT PRIMARY KEY,
+    nickname TEXT DEFAULT '玩家',
+    avatar_index INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 修改 game_ranks 表结构（如果需要）
+-- 注意：SQLite 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS
+-- 所以我们先检查是否存在 openid 列

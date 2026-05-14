@@ -1,20 +1,93 @@
 /**
- * 小游戏排行榜 API
+ * 小游戏排行榜 API - 支持用户系统
  */
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../utils/database');
 
-// 排行榜缓存（减少数据库读取）
+// 排行榜缓存
 const rankCache = {};
-const CACHE_TTL = 30000; // 30秒缓存
+const CACHE_TTL = 30000;
 
-// 获取排行榜
-router.get('/rank/:gameId', async (req, res) => {
+// ==================== 用户相关 API ====================
+
+// 保存/更新用户信息
+router.post('/user', (req, res) => {
+  try {
+    const { openid, nickname, avatarIndex } = req.body;
+    
+    if (!openid) {
+      return res.json({ success: false, message: '缺少 openid' });
+    }
+    
+    const db = getDb();
+    
+    // 先检查用户是否存在
+    const existing = db.prepare('SELECT openid FROM users WHERE openid = ?').get(openid);
+    
+    if (existing) {
+      // 更新用户信息
+      db.prepare(`
+        UPDATE users 
+        SET nickname = ?, avatar_index = ?, updated_at = datetime('now', 'localtime')
+        WHERE openid = ?
+      `).run(nickname || '玩家', avatarIndex || 0, openid);
+    } else {
+      // 创建新用户
+      db.prepare(`
+        INSERT INTO users (openid, nickname, avatar_index, created_at, updated_at)
+        VALUES (?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
+      `).run(openid, nickname || '玩家', avatarIndex || 0);
+    }
+    
+    res.json({
+      success: true,
+      data: { openid, nickname: nickname || '玩家', avatarIndex: avatarIndex || 0 }
+    });
+  } catch (e) {
+    console.error('保存用户失败:', e);
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// 获取用户信息
+router.get('/user/:openid', (req, res) => {
+  try {
+    const { openid } = req.params;
+    
+    if (!openid) {
+      return res.json({ success: false, message: '缺少 openid' });
+    }
+    
+    const db = getDb();
+    const user = db.prepare('SELECT openid, nickname, avatar_index, created_at FROM users WHERE openid = ?').get(openid);
+    
+    if (user) {
+      res.json({
+        success: true,
+        data: {
+          openid: user.openid,
+          nickname: user.nickname || '玩家',
+          avatarIndex: user.avatar_index || 0
+        }
+      });
+    } else {
+      res.json({ success: true, data: null });
+    }
+  } catch (e) {
+    console.error('获取用户失败:', e);
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// ==================== 排行榜 API ====================
+
+// 获取排行榜（关联用户表获取昵称）
+router.get('/rank/:gameId', (req, res) => {
   try {
     const { gameId } = req.params;
     const limit = parseInt(req.query.limit) || 10;
-    const sort = req.query.sort || 'desc'; // desc=分数高的在前，asc=分数少的在前
+    const sort = req.query.sort || 'desc';
     
     // 检查缓存
     const cacheKey = `${gameId}_${sort}_${limit}`;
@@ -26,11 +99,15 @@ router.get('/rank/:gameId', async (req, res) => {
     const db = getDb();
     const order = sort === 'asc' ? 'ASC' : 'DESC';
     
+    // 关联 users 表获取最新昵称和头像
     const results = db.prepare(`
-      SELECT id, game_id, score, nickname, avatar, created_at
-      FROM game_ranks
-      WHERE game_id = ? AND score > 0
-      ORDER BY score ${order}
+      SELECT 
+        r.id, r.game_id, r.score, r.openid, r.created_at,
+        u.nickname, u.avatar_index
+      FROM game_ranks r
+      LEFT JOIN users u ON r.openid = u.openid
+      WHERE r.game_id = ? AND r.score > 0
+      ORDER BY r.score ${order}
       LIMIT ?
     `).all(gameId, limit);
     
@@ -38,7 +115,8 @@ router.get('/rank/:gameId', async (req, res) => {
       rank: index + 1,
       score: row.score,
       nickname: row.nickname || '玩家',
-      avatar: row.avatar,
+      avatar: `color:${row.avatar_index || 0}`,
+      openid: row.openid,
       date: formatDate(row.created_at)
     }));
     
@@ -52,11 +130,11 @@ router.get('/rank/:gameId', async (req, res) => {
   }
 });
 
-// 提交成绩
-router.post('/rank/:gameId', async (req, res) => {
+// 提交成绩（只存 openid，昵称从 users 表获取）
+router.post('/rank/:gameId', (req, res) => {
   try {
     const { gameId } = req.params;
-    const { score, nickname, openid, avatar } = req.body;
+    const { score, openid } = req.body;
     
     // 0分不记录
     if (!score || score <= 0) {
@@ -65,19 +143,22 @@ router.post('/rank/:gameId', async (req, res) => {
     
     const db = getDb();
     
-    // 插入记录
-    db.prepare(`
-      INSERT INTO game_ranks (game_id, score, nickname, openid, avatar, created_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))
-    `).run(gameId, score, nickname || '玩家', openid || null, avatar || null);
+    // 获取用户信息
+    const user = openid ? db.prepare('SELECT nickname, avatar_index FROM users WHERE openid = ?').get(openid) : null;
     
-    // 清除该游戏的缓存
+    // 插入记录（只存 openid）
+    db.prepare(`
+      INSERT INTO game_ranks (game_id, score, openid, created_at)
+      VALUES (?, ?, ?, datetime('now', 'localtime'))
+    `).run(gameId, score, openid || null);
+    
+    // 清除缓存
     Object.keys(rankCache).forEach(key => {
       if (key.startsWith(gameId)) delete rankCache[key];
     });
     
-    // 返回当前排名
-    const sort = gameId === 'memory' ? 'ASC' : 'DESC';
+    // 计算排名
+    const sort = gameId === 'memory' ? 'asc' : 'desc';
     const order = sort === 'asc' ? 'ASC' : 'DESC';
     
     const rankResult = db.prepare(`
@@ -90,8 +171,8 @@ router.post('/rank/:gameId', async (req, res) => {
       success: true,
       data: {
         score,
-        nickname: nickname,
-        avatar: avatar,  // 返回 avatar 信息
+        nickname: user?.nickname || '玩家',
+        avatar: `color:${user?.avatar_index || 0}`,
         rank: rankResult?.rank || 1,
         message: '成绩已提交'
       }
@@ -103,7 +184,7 @@ router.post('/rank/:gameId', async (req, res) => {
 });
 
 // 获取用户在某游戏的最佳成绩
-router.get('/rank/:gameId/my-best', async (req, res) => {
+router.get('/rank/:gameId/my-best', (req, res) => {
   try {
     const { gameId } = req.params;
     const { openid } = req.query;
@@ -113,14 +194,15 @@ router.get('/rank/:gameId/my-best', async (req, res) => {
     }
     
     const db = getDb();
-    const sort = gameId === 'memory' ? 'ASC' : 'DESC';
+    const sort = gameId === 'memory' ? 'asc' : 'desc';
     const order = sort === 'asc' ? 'ASC' : 'DESC';
     
     const result = db.prepare(`
-      SELECT score, nickname, created_at
-      FROM game_ranks
-      WHERE game_id = ? AND openid = ?
-      ORDER BY score ${order}
+      SELECT r.score, r.created_at, u.nickname, u.avatar_index
+      FROM game_ranks r
+      LEFT JOIN users u ON r.openid = u.openid
+      WHERE r.game_id = ? AND r.openid = ?
+      ORDER BY r.score ${order}
       LIMIT 1
     `).get(gameId, openid);
     
@@ -129,7 +211,8 @@ router.get('/rank/:gameId/my-best', async (req, res) => {
         success: true,
         data: {
           score: result.score,
-          nickname: result.nickname,
+          nickname: result.nickname || '玩家',
+          avatarIndex: result.avatar_index || 0,
           date: formatDate(result.created_at)
         }
       });
@@ -143,11 +226,10 @@ router.get('/rank/:gameId/my-best', async (req, res) => {
 });
 
 // 获取所有游戏统计
-router.get('/stats', async (req, res) => {
+router.get('/stats', (req, res) => {
   try {
     const db = getDb();
     
-    // 各游戏参与人数和最高分
     const stats = db.prepare(`
       SELECT 
         game_id,
@@ -166,29 +248,21 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// 清除某游戏排行榜（需管理员权限，暂不实现）
-router.delete('/rank/:gameId', async (req, res) => {
-  res.json({ success: false, message: '暂不支持清除排行榜' });
-});
-
 // 格式化日期
 function formatDate(dateStr) {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
-    // GMT+8 格式显示
-    return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' , hour12: false });
-  } catch {
-    return dateStr;
-  }
-}
-
-// 旧的 formatDate 函数被替换
-function formatDateOld(dateStr) {
-  if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('zh-CN');
+    const options = {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    };
+    return d.toLocaleString('zh-CN', options);
   } catch {
     return dateStr;
   }
