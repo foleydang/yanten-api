@@ -112,4 +112,16 @@ router.delete('/batch', async (req, res) => {
     } catch (e) { res.json({s: false, m: e.message}); }
 });
 
+// 批量通过
+router.post('/batch/approve', async (req, res) => {
+    try {
+        const database = await getDB();
+        const {ids} = req.body;
+        if (!ids?.length) return res.json({s: false, m: '无选中'});
+        database.exec(`UPDATE jokes SET status='approved' WHERE id IN (${ids.join(',')})`);
+        saveDB();
+        res.json({s: true, d: {approved: ids.length}});
+    } catch (e) { res.json({s: false, m: e.message}); }
+});
+
 module.exports = router;

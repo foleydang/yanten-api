@@ -104,6 +104,7 @@
             <input type="text" id="search" placeholder="搜索...">
             <button class="btn btn-primary" onclick="load(1)">筛选</button>
             <button class="btn btn-secondary" onclick="reset()">重置</button>
+            <button class="btn btn-success" id="batchApproveBtn" style="display:none" onclick="batchApprove()">批量通过 (<span id="approveCnt">0</span>)</button>
             <button class="btn btn-danger" id="batchBtn" style="display:none" onclick="batchDel()">批量删除 (<span id="cnt">0</span>)</button>
         </div>
         <div class="table-wrap">
@@ -224,7 +225,7 @@
             }
             b.innerHTML = list.map(j => 
                 '<tr>' +
-                '<td><input type="checkbox" onchange="toggle(' + j.id + ')"></td>' +
+                '<td><input type="checkbox" ' + (selected.has(j.id) ? 'checked' : '') + ' onchange="toggle(' + j.id + ')"></td>' +
                 '<td>' + j.id + '</td>' +
                 '<td>' + (j.category || '搞笑') + '</td>' +
                 '<td>' + esc(j.title) + '</td>' +
@@ -270,11 +271,15 @@
         function toggle(id) {
             selected.has(id) ? selected.delete(id) : selected.add(id);
             upd();
+            render();  // 重新渲染以显示勾选状态
         }
         
         function upd() {
-            document.getElementById('batchBtn').style.display = selected.size ? 'inline-block' : 'none';
+            let display = selected.size ? 'inline-block' : 'none';
+            document.getElementById('batchBtn').style.display = display;
+            document.getElementById('batchApproveBtn').style.display = display;
             document.getElementById('cnt').textContent = selected.size;
+            document.getElementById('approveCnt').textContent = selected.size;
         }
         
         function view(id) {
@@ -373,6 +378,26 @@
                 if (d.s) {
                     toast('删除成功', 'success');
                     selected.clear();
+                    upd();
+                    load(page);
+                    stats();
+                } else { toast(d.m || '失败', 'error'); }
+            } catch(e) { toast('网络错误', 'error'); }
+        }
+        
+        async function batchApprove() {
+            if (!selected.size || !confirm('通过 ' + selected.size + ' 条？')) return;
+            try {
+                let r = await fetch(API + '/batch/approve', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ids: Array.from(selected)})
+                });
+                let d = await r.json();
+                if (d.s) {
+                    toast('已通过 ' + d.d.approved + ' 条 ✓', 'success');
+                    selected.clear();
+                    upd();
                     load(page);
                     stats();
                 } else { toast(d.m || '失败', 'error'); }
