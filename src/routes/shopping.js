@@ -243,7 +243,7 @@ router.delete('/clear-done/:familyId', authMiddleware, (req, res) => {
   }
 });
 
-// 获取分类列表
+// 获取分类列表（公开，无需认证）
 router.get('/categories', (req, res) => {
   res.json({
     success: true,
