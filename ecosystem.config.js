@@ -2,19 +2,28 @@ module.exports = {
   apps: [{
     name: 'yanten-api',
     script: './src/index.js',
-    instances: 1,           // 单实例（SQLite不支持多进程）
-    exec_mode: 'fork',      // fork模式（不是cluster）
+    cwd: '/root/github/yanten-api',
+    instances: 1,
+    exec_mode: 'fork',
     autorestart: true,
     watch: false,
     max_memory_restart: '200M',
-    restart_delay: 3000,    // 重启延迟3秒
+    restart_delay: 3000,
     env: {
       NODE_ENV: 'development',
-      PORT: 3000
+      PORT: 3000,
+      WECHAT_APP_ID: 'wx0e9d435ac360a024',
+      WECHAT_APP_SECRET: '3c31ebf06e43a1c84f9109d96fd70bd2',
+      JWT_SECRET: 'yanten-family-memo-secret-key-2024',
+      JWT_EXPIRES_IN: '7d'
     },
     env_production: {
-      NODE_ENV: 'production',  // 生产环境
-      PORT: 3000
+      NODE_ENV: 'production',
+      PORT: 3000,
+      WECHAT_APP_ID: 'wx0e9d435ac360a024',
+      WECHAT_APP_SECRET: '3c31ebf06e43a1c84f9109d96fd70bd2',
+      JWT_SECRET: 'yanten-family-memo-secret-key-2024',
+      JWT_EXPIRES_IN: '7d'
     }
   }]
 };

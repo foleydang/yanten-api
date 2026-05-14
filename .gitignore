@@ -1,13 +1,6 @@
 node_modules/
 .env
-# SQLite 数据库文件（二进制，变化频繁，不提交）
-data/database/*.db
-data/database/*.backup*
-data/database/*.bak
-data/database/*.json
-data/uploads/*
+
 # 日志文件
 *.log
 .DS_Store
-# 备份脚本生成的临时文件
-*.tmp
