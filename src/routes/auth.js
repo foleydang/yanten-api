@@ -82,6 +82,8 @@ async function handleLogin(openid, res) {
         id: user.id,
         nickname: user.nickname,
         avatar: user.avatar,
+        avatarUrl: user.avatar,  // 兼容前端
+        name: user.nickname,
         role: user.role
       }
     },
@@ -134,6 +136,7 @@ router.get('/user', authMiddleware, (req, res) => {
     data: {
       ...user,
       name: user.nickname,
+      avatarUrl: user.avatar,  // 兼容前端
       families,
       familyInfo: families[0] || null
     }
