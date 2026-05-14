@@ -174,6 +174,18 @@ function formatDate(dateStr) {
   if (!dateStr) return '';
   try {
     const d = new Date(dateStr);
+    // GMT+8 格式显示
+    return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' , hour12: false });
+  } catch {
+    return dateStr;
+  }
+}
+
+// 旧的 formatDate 函数被替换
+function formatDateOld(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
     return d.toLocaleDateString('zh-CN');
   } catch {
     return dateStr;
