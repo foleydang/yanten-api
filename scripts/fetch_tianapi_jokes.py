@@ -71,11 +71,44 @@ def save_jokes(jokes):
     conn.close()
     return count
 
+def cleanup_bad_jokes():
+    """删除差评笑话：dislikes >= 3 且 dislikes > likes"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT id, title, likes, dislikes FROM jokes 
+        WHERE status='approved' AND dislikes >= 3 AND dislikes > likes
+    """)
+    bad_jokes = cursor.fetchall()
+    
+    if bad_jokes:
+        ids = [j[0] for j in bad_jokes]
+        for j in bad_jokes:
+            print(f"  删除差评 #{j[0]}: {j[1][:30]}... (👍{j[2]} 👎{j[3]})")
+        
+        placeholders = ','.join(['?'] * len(ids))
+        cursor.execute(f"DELETE FROM jokes WHERE id IN ({placeholders})", ids)
+        # 也删除相关收藏
+        cursor.execute(f"DELETE FROM favorites WHERE joke_id IN ({placeholders})", ids)
+        conn.commit()
+        print(f"  共删除 {len(bad_jokes)} 条差评笑话")
+    else:
+        print("  无差评笑话需删除")
+    
+    conn.close()
+
 def main():
     print("=" * 50)
-    print("获取天行API笑话 - 直接保存，不做过滤")
+    print("获取天行API笑话 - 先清理差评，再新增")
     print("=" * 50)
     
+    # Step 1: 清理差评笑话
+    print("\nStep 1: 清理差评笑话")
+    cleanup_bad_jokes()
+    
+    # Step 2: 新增笑话
+    print("\nStep 2: 新增笑话")
     total = 0
     
     # 获取笑话（多页）
