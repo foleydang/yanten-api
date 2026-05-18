@@ -17,6 +17,7 @@ function authMiddleware(req, res, next) {
     const decoded = jwt.verify(token, config.jwt.secret);
     req.userId = decoded.userId;
     req.openid = decoded.openid;
+    req.role = decoded.role;
     next();
   } catch (error) {
     return res.status(401).json({ 
@@ -58,8 +59,13 @@ function familyMemberMiddleware(req, res, next) {
 
 // 管理员检查中间件
 function adminMiddleware(req, res, next) {
-  const db = getDb();
+  // 通过 admin login 获得的 token 直接带 role: 'admin'
+  if (req.role === 'admin') {
+    return next();
+  }
   
+  // 通过微信登录的用户，检查数据库中的 role
+  const db = getDb();
   const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.userId);
   
   if (!user || user.role !== 'admin') {

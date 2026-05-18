@@ -35,7 +35,7 @@
         .filters { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .filters select, .filters input { padding: 12px 16px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 14px; min-width: 120px; }
         .filters input { width: 200px; }
-        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn { padding: 8px 14px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; white-space: nowrap; }
         .btn-primary { background: var(--primary); color: #fff; }
         .btn-success { background: var(--success); color: #fff; }
         .btn-danger { background: var(--danger); color: #fff; }
@@ -53,7 +53,7 @@
         .col-title { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
         .col-content { max-width: 300px; overflow: hidden; text-overflow: ellipsis; color: var(--gray-500); }
         .col-status { width: 100px; }
-        .col-actions { width: 220px; }
+        .col-actions { width: 280px; }
         
         .tag { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .tag-approved { background: #dcfce7; color: #166534; }
@@ -92,10 +92,33 @@
         
         input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); }
         .empty { padding: 40px; text-align: center; color: var(--gray-500); }
+        
+        /* 登录样式 */
+        .login-wrap { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-card { background: var(--card); padding: 40px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 360px; }
+        .login-card h1 { text-align: center; margin-bottom: 32px; }
+        .login-card .form-group { margin-bottom: 20px; }
+        .login-card .btn { width: 100%; padding: 14px; font-size: 16px; }
+        .login-err { color: var(--danger); text-align: center; margin-top: 12px; font-size: 14px; }
+        #mainContent { display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- 登录页 -->
+    <div class="login-wrap" id="loginPage">
+        <div class="login-card">
+            <h1><span>😄</span> 哇哇笑管理</h1>
+            <div class="form-group">
+                <label>管理密码</label>
+                <input type="password" id="loginPwd" placeholder="请输入管理密码">
+            </div>
+            <button class="btn btn-primary" onclick="doLogin()">登录</button>
+            <div class="login-err" id="loginErr"></div>
+        </div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="container" id="mainContent">
         <div class="header"><h1><span>😄</span> 哇哇笑笑话审核</h1></div>
         <div class="stats" id="stats"></div>
         <div class="filters">
@@ -157,6 +180,71 @@
     <script>
         const API = '/api/admin/jokes';
         let list = [], curId = null, selected = new Set(), page = 1, size = 30, total = 0;
+        let TOKEN = localStorage.getItem('admin_token') || '';
+        
+        // 检查登录状态
+        function checkAuth() {
+            if (!TOKEN) {
+                document.getElementById('loginPage').style.display = 'flex';
+                document.getElementById('mainContent').style.display = 'none';
+                return;
+            }
+            // 验证 token 是否有效
+            fetch(API + '/stats', { headers: { 'Authorization': 'Bearer ' + TOKEN } })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.s) {
+                        document.getElementById('loginPage').style.display = 'none';
+                        document.getElementById('mainContent').style.display = 'block';
+                        init();
+                    } else {
+                        // token 无效，重新登录
+                        TOKEN = '';
+                        localStorage.removeItem('admin_token');
+                        document.getElementById('loginPage').style.display = 'flex';
+                        document.getElementById('mainContent').style.display = 'none';
+                    }
+                })
+                .catch(() => {
+                    TOKEN = '';
+                    localStorage.removeItem('admin_token');
+                    document.getElementById('loginPage').style.display = 'flex';
+                    document.getElementById('mainContent').style.display = 'none';
+                });
+        }
+        
+        async function doLogin() {
+            const pwd = document.getElementById('loginPwd').value;
+            if (!pwd) return;
+            
+            try {
+                let r = await fetch(API + '/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ password: pwd })
+                });
+                let d = await r.json();
+                if (d.s) {
+                    TOKEN = d.d.token;
+                    localStorage.setItem('admin_token', TOKEN);
+                    document.getElementById('loginErr').textContent = '';
+                    document.getElementById('loginPage').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                    init();
+                } else {
+                    document.getElementById('loginErr').textContent = d.m || '密码错误';
+                }
+            } catch(e) {
+                document.getElementById('loginErr').textContent = '网络错误';
+            }
+        }
+        
+        // 所有 API 请求带上 token
+        function authFetch(url, opts = {}) {
+            opts.headers = opts.headers || {};
+            opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+            return fetch(url, opts);
+        }
         
         async function init() {
             await stats();
@@ -166,7 +254,7 @@
         
         async function stats() {
             try {
-                let r = await fetch(API + '/stats');
+                let r = await authFetch(API + '/stats');
                 let d = await r.json();
                 if (d.s && d.d) {
                     document.getElementById('stats').innerHTML = 
@@ -179,7 +267,7 @@
         
         async function cats() {
             try {
-                let r = await fetch(API + '/categories');
+                let r = await authFetch(API + '/categories');
                 let d = await r.json();
                 if (d.s && d.d) {
                     let sel = document.getElementById('cat');
@@ -198,7 +286,7 @@
             let q = '?page=' + page + '&limit=' + size + '&category=' + encodeURIComponent(cat) + '&status=' + encodeURIComponent(st) + '&search=' + encodeURIComponent(se);
             
             try {
-                let r = await fetch(API + q);
+                let r = await authFetch(API + q);
                 let d = await r.json();
                 console.log('load result', d);
                 if (d.s && d.d) {
@@ -269,9 +357,9 @@
         }
         
         function toggle(id) {
-            selected.has(id) ? selected.delete(id) : selected.add(id);
+            selected.has(id) ? selected.delete(id) : selected.add(id.id);
             upd();
-            render();  // 重新渲染以显示勾选状态
+            render();
         }
         
         function upd() {
@@ -307,7 +395,7 @@
         
         async function approve(id) {
             try {
-                let r = await fetch(API + '/' + id, {
+                let r = await authFetch(API + '/' + id, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({status: 'approved'})
@@ -333,7 +421,7 @@
             if (!t || !x) { toast('必填', 'error'); return; }
             
             try {
-                let r = await fetch(API + '/' + id, {
+                let r = await authFetch(API + '/' + id, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({title: t, content: x, status: 'approved'})
@@ -351,7 +439,7 @@
         async function del(id) {
             if (!confirm('确定删除？')) return;
             try {
-                let r = await fetch(API + '/' + id, {method: 'DELETE'});
+                let r = await authFetch(API + '/' + id, {method: 'DELETE'});
                 let d = await r.json();
                 if (d.s) {
                     toast('已删除', 'success');
@@ -369,7 +457,7 @@
         async function batchDel() {
             if (!selected.size || !confirm('删除 ' + selected.size + ' 条？')) return;
             try {
-                let r = await fetch(API + '/batch', {
+                let r = await authFetch(API + '/batch', {
                     method: 'DELETE',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ids: Array.from(selected)})
@@ -388,7 +476,7 @@
         async function batchApprove() {
             if (!selected.size || !confirm('通过 ' + selected.size + ' 条？')) return;
             try {
-                let r = await fetch(API + '/batch/approve', {
+                let r = await authFetch(API + '/batch/approve', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ids: Array.from(selected)})
@@ -418,7 +506,8 @@
             return !s ? '' : s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
         
-        init();
+        // 启动时检查登录
+        checkAuth();
     </script>
 </body>
 </html>

@@ -22,6 +22,20 @@ const gamesRoutes = require('./routes/games');
 
 const app = express();
 
+// 自动审核：超过1天的pending笑话自动通过
+function autoApproveJokes() {
+  try {
+    const db = getDb();
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const result = db.prepare('UPDATE jokes SET status = "approved" WHERE status = "pending" AND date <= ?').run(yesterday);
+    if (result.changes > 0) {
+      console.log(`🤖 自动审核：${result.changes}条笑话已通过（超过1天未审核）`);
+    }
+  } catch (e) {
+    console.error('自动审核失败:', e.message);
+  }
+}
+
 // CORS
 const corsOptions = process.env.NODE_ENV === 'production' ? {
   origin: ['https://yanten.top', 'https://api.yanten.top', 'https://servicewechat.com'],
@@ -41,8 +55,7 @@ app.use('/api/', apiLimiter);
 // 路由
 app.use('/api/auth', strictLimiter, authRoutes);
 app.use('/api/family', authMiddleware, familyRoutes);
-// 购物清单API（shopping.js 中有分类公开访问路由）
-app.use('/api/shopping', shoppingRoutes);  // shopping.js中按需添加认证
+app.use('/api/shopping', shoppingRoutes);
 app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
@@ -113,11 +126,15 @@ async function start() {
     await initDatabase();
     console.log('✅ 数据库初始化完成');
     
+    autoApproveJokes();
+    setInterval(autoApproveJokes, 3600000);
+    
     app.listen(config.port, () => {
       console.log(`🚀 服务已启动: http://localhost:${config.port}`);
       console.log(`🌍 环境: ${process.env.NODE_ENV || 'development'}`);
       console.log('💕 家庭备忘录，记录爱的每一刻');
       console.log('🔒 API限流已启用');
+      console.log('🤖 笑话自动审核已启用（超过1天自动通过）');
     });
   } catch (error) {
     console.error('启动失败:', error);

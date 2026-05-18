@@ -141,3 +141,14 @@ CREATE TABLE IF NOT EXISTS users (
 -- 修改 game_ranks 表结构（如果需要）
 -- 注意：SQLite 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS
 -- 所以我们先检查是否存在 openid 列
+
+-- 哇哇笑收藏表
+CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    joke_id INTEGER NOT NULL,
+    openid TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(joke_id, openid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_openid ON favorites(openid);

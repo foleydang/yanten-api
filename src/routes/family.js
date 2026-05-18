@@ -132,11 +132,19 @@ router.get('/:familyId', authMiddleware, (req, res) => {
       ORDER BY fm.joined_at
     `).all(familyId);
     
+    // 清理失效的 cloud:// URL，构建完整可访问 URL
+    const baseUrl = 'https://api.yanten.top';
+    const cleanedMembers = members.map(m => ({
+      ...m,
+      avatar: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar ? baseUrl + m.avatar : ''),
+      avatarUrl: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar ? baseUrl + m.avatar : '')
+    }));
+
     res.json({
       success: true,
       data: {
         ...family,
-        members
+        members: cleanedMembers
       }
     });
   } catch (error) {

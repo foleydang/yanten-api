@@ -16,7 +16,12 @@ module.exports = {
   // JWT 配置
   jwt: {
     secret: process.env.JWT_SECRET || 'family-memo-secret-key-2024',
-    expiresIn: '7d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '90d',
+  },
+  
+  // 管理员配置
+  admin: {
+    password: process.env.ADMIN_PASSWORD || 'admin123',
   },
   
   // 服务地址

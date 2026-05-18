@@ -1,127 +1,150 @@
 const express = require('express');
 const router = express.Router();
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const jwt = require('jsonwebtoken');
+const config = require('../../config/default');
+const { getDb } = require('../utils/database');
+const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
-const DB_FILE = path.join(__dirname, '../../data/database/main.db');
-let db = null;
+// 管理员登录（不需要认证）
+router.post('/login', (req, res) => {
+  const { password } = req.body;
+  
+  if (password === config.admin.password) {
+    // 生成管理员 token，标记 role 为 admin
+    const token = jwt.sign(
+      { userId: 'admin', openid: 'admin', role: 'admin' },
+      config.jwt.secret,
+      { expiresIn: config.jwt.expiresIn }
+    );
+    res.json({ s: true, d: { token } });
+  } else {
+    res.json({ s: false, m: '密码错误' });
+  }
+});
 
-async function getDB() {
-    if (!db) {
-        const SQL = await initSqlJs();
-        const buffer = fs.readFileSync(DB_FILE);
-        db = new SQL.Database(buffer);
-    }
-    return db;
-}
-
-function saveDB() {
-    if (db) {
-        const data = db.export();
-        fs.writeFileSync(DB_FILE, Buffer.from(data));
-    }
-}
+// 以下路由需要管理员认证
+router.use(authMiddleware, adminMiddleware);
 
 // 统计
-router.get('/stats', async (req, res) => {
-    try {
-        const database = await getDB();
-        const r = database.exec("SELECT '总数',COUNT(*) FROM jokes UNION ALL SELECT '已审核',COUNT(*) WHERE status='approved' UNION ALL SELECT '待审核',COUNT(*) WHERE status='pending'");
-        res.json({s: true, d: r[0]?.values.map(x => ({category: x[0], count: x[1]})) || []});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.get('/stats', (req, res) => {
+  try {
+    const db = getDb();
+    const total = db.prepare('SELECT COUNT(*) as count FROM jokes').get()?.count || 0;
+    const approved = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved"').get()?.count || 0;
+    const pending = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="pending"').get()?.count || 0;
+    res.json({s: true, d: [
+      {category: '总数', count: total},
+      {category: '已审核', count: approved},
+      {category: '待审核', count: pending}
+    ]});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 // 分类统计
-router.get('/categories', async (req, res) => {
-    try {
-        const database = await getDB();
-        const r = database.exec("SELECT category, COUNT(*) FROM jokes GROUP BY category ORDER BY COUNT(*) DESC");
-        res.json({s: true, d: r[0]?.values.map(x => ({category: x[0], count: x[1]})) || []});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.get('/categories', (req, res) => {
+  try {
+    const db = getDb();
+    const results = db.prepare('SELECT category, COUNT(*) as count FROM jokes GROUP BY category ORDER BY COUNT(*) DESC').all();
+    res.json({s: true, d: results});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 // 列表
-router.get('/', async (req, res) => {
-    try {
-        const database = await getDB();
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 30;
-        const category = req.query.category || '';
-        const status = req.query.status || '';
-        const search = req.query.search || '';
-        const offset = (page - 1) * limit;
-        
-        let where = 'WHERE 1=1';
-        if (category) where += ` AND category='${category.replace(/'/g,"''")}'`;
-        if (status) where += ` AND status='${status.replace(/'/g,"''")}'`;
-        if (search) where += ` AND (title LIKE '%${search.replace(/'/g,"''")}%' OR content LIKE '%${search.replace(/'/g,"''")}%')`;
-        
-        const totalR = database.exec(`SELECT COUNT(*) FROM jokes ${where}`);
-        const total = totalR[0]?.values[0]?.[0] || 0;
-        
-        const listR = database.exec(`SELECT id,category,title,content,status FROM jokes ${where} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
-        res.json({s: true, d: {list: listR[0]?.values.map(r => ({id: r[0], category: r[1], title: r[2], content: r[3], status: r[4]})) || [], total}});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.get('/', (req, res) => {
+  try {
+    const db = getDb();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 30;
+    const category = req.query.category || '';
+    const status = req.query.status || '';
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+    
+    let conditions = [];
+    let params = [];
+    
+    if (category) {
+      conditions.push('category=?');
+      params.push(category);
+    }
+    if (status) {
+      conditions.push('status=?');
+      params.push(status);
+    }
+    if (search) {
+      conditions.push('(title LIKE ? OR content LIKE ?)');
+      params.push('%' + search + '%', '%' + search + '%');
+    }
+    
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    
+    const total = db.prepare(`SELECT COUNT(*) as count FROM jokes ${whereClause}`).get(...params)?.count || 0;
+    const list = db.prepare(`SELECT id, category, title, content, status FROM jokes ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+    
+    res.json({s: true, d: {list, total}});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 // 更新
-router.put('/:id', async (req, res) => {
-    try {
-        const database = await getDB();
-        const id = parseInt(req.params.id);
-        const {title, content, status} = req.body;
-        
-        if (status && !title && !content) {
-            database.exec(`UPDATE jokes SET status='${status}' WHERE id=${id}`);
-            saveDB();
-            return res.json({s: true});
-        }
-        
-        if (title && content) {
-            const safeTitle = title.replace(/'/g, "''");
-            const safeContent = content.replace(/'/g, "''");
-            database.exec(`UPDATE jokes SET title='${safeTitle}', content='${safeContent}', status='approved' WHERE id=${id}`);
-            saveDB();
-            return res.json({s: true});
-        }
-        
-        res.json({s: false, m: '参数错误'});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.put('/:id', (req, res) => {
+  try {
+    const db = getDb();
+    const id = parseInt(req.params.id);
+    const {title, content, status} = req.body;
+    
+    if (status && !title && !content) {
+      db.prepare('UPDATE jokes SET status=? WHERE id=?').run(status, id);
+      return res.json({s: true});
+    }
+    
+    if (title && content) {
+      db.prepare('UPDATE jokes SET title=?, content=?, status="approved" WHERE id=?').run(title, content, id);
+      return res.json({s: true});
+    }
+    
+    res.json({s: false, m: '参数错误'});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 // 删除
-router.delete('/:id', async (req, res) => {
-    try {
-        const database = await getDB();
-        database.exec(`DELETE FROM jokes WHERE id=${parseInt(req.params.id)}`);
-        saveDB();
-        res.json({s: true});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.delete('/:id', (req, res) => {
+  try {
+    const db = getDb();
+    db.prepare('DELETE FROM jokes WHERE id=?').run(parseInt(req.params.id));
+    res.json({s: true});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 // 批量删除
-router.delete('/batch', async (req, res) => {
-    try {
-        const database = await getDB();
-        const {ids} = req.body;
-        if (!ids?.length) return res.json({s: false, m: '无选中'});
-        database.exec(`DELETE FROM jokes WHERE id IN (${ids.join(',')})`);
-        saveDB();
-        res.json({s: true, d: {deleted: ids.length}});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.delete('/batch', (req, res) => {
+  try {
+    const db = getDb();
+    const {ids} = req.body;
+    if (!ids?.length) return res.json({s: false, m: '无选中'});
+    
+    const validIds = ids.map(id => parseInt(id)).filter(id => id > 0);
+    if (validIds.length !== ids.length) return res.json({s: false, m: '参数错误'});
+    
+    const placeholders = validIds.map(() => '?').join(',');
+    db.prepare(`DELETE FROM jokes WHERE id IN (${placeholders})`).run(...validIds);
+    res.json({s: true, d: {deleted: validIds.length}});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 // 批量通过
-router.post('/batch/approve', async (req, res) => {
-    try {
-        const database = await getDB();
-        const {ids} = req.body;
-        if (!ids?.length) return res.json({s: false, m: '无选中'});
-        database.exec(`UPDATE jokes SET status='approved' WHERE id IN (${ids.join(',')})`);
-        saveDB();
-        res.json({s: true, d: {approved: ids.length}});
-    } catch (e) { res.json({s: false, m: e.message}); }
+router.post('/batch/approve', (req, res) => {
+  try {
+    const db = getDb();
+    const {ids} = req.body;
+    if (!ids?.length) return res.json({s: false, m: '无选中'});
+    
+    const validIds = ids.map(id => parseInt(id)).filter(id => id > 0);
+    if (validIds.length !== ids.length) return res.json({s: false, m: '参数错误'});
+    
+    const placeholders = validIds.map(() => '?').join(',');
+    db.prepare(`UPDATE jokes SET status="approved" WHERE id IN (${placeholders})`).run(...validIds);
+    res.json({s: true, d: {approved: validIds.length}});
+  } catch (e) { res.json({s: false, m: e.message}); }
 });
 
 module.exports = router;
