@@ -1,3 +1,6 @@
+/**
+ * 路由文件: /root/github/yanten-api/src/routes/$f
+ */
 const express = require('express');
 const multer = require('multer');
 const path = require('path');

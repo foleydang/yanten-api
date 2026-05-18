@@ -1,3 +1,6 @@
+/**
+ * 路由文件: /root/github/yanten-api/src/routes/$f
+ */
 const baseUrl = 'https://api.yanten.top';
 const express = require('express');
 const jwt = require('jsonwebtoken');

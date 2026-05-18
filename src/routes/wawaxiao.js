@@ -1,3 +1,11 @@
+/**
+ * 哇哇笑笑话 API
+ * - 笑话查询（列表/热门/最新/随机/详情）
+ * - 用户互动（点赞/一般/不喜欢）
+ * - 收藏系统（添加/删除/列表/批量检查）
+ * - 用户投稿（提交/查询我的投稿）
+ * - 用户体系共用 auth.js 的 users 表
+ */
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../utils/database');

@@ -1,3 +1,6 @@
+/**
+ * 路由文件: /root/github/yanten-api/src/routes/$f
+ */
 const express = require('express');
 const { getDb } = require('../utils/database');
 const { authMiddleware } = require('../middleware/auth');
