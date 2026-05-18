@@ -1,14 +1,16 @@
--- 家庭备忘录数据库初始化脚本
--- SQLite
+-- 焦腾家庭备忘录数据库初始化脚本
+-- SQLite - 统一用户体系
 
--- 用户表
+-- 用户表（统一：auth/games/wawaxiao 共用）
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     openid TEXT UNIQUE NOT NULL,
-    nickname TEXT,
-    avatar TEXT,
+    nickname TEXT DEFAULT '新成员',
+    avatar TEXT DEFAULT '',
+    avatar_index INTEGER DEFAULT 0,
     role TEXT DEFAULT 'member',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 家庭表
@@ -103,44 +105,15 @@ CREATE TABLE IF NOT EXISTS feedback (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 创建索引
-CREATE INDEX IF NOT EXISTS idx_shopping_family ON shopping_items(family_id);
-CREATE INDEX IF NOT EXISTS idx_shopping_status ON shopping_items(status);
-CREATE INDEX IF NOT EXISTS idx_todo_family ON todos(family_id);
-CREATE INDEX IF NOT EXISTS idx_todo_status ON todos(status);
-CREATE INDEX IF NOT EXISTS idx_schedule_family ON schedules(family_id);
-CREATE INDEX IF NOT EXISTS idx_schedule_date ON schedules(schedule_date);
-CREATE INDEX IF NOT EXISTS idx_family_members ON family_members(family_id, user_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
-
--- 小游戏排行榜表
+-- 小游戏排行榜表（使用 user_id 关联统一用户表，保留 openid 兼容）
 CREATE TABLE IF NOT EXISTS game_ranks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     game_id TEXT NOT NULL,
     score INTEGER NOT NULL,
-    nickname TEXT DEFAULT '玩家',
+    user_id INTEGER,
     openid TEXT,
-    avatar TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-
--- 游戏排行榜索引
-CREATE INDEX IF NOT EXISTS idx_game_ranks_game ON game_ranks(game_id);
-CREATE INDEX IF NOT EXISTS idx_game_ranks_score ON game_ranks(game_id, score DESC);
-
--- 用户表
-CREATE TABLE IF NOT EXISTS users (
-    openid TEXT PRIMARY KEY,
-    nickname TEXT DEFAULT '玩家',
-    avatar_index INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- 修改 game_ranks 表结构（如果需要）
--- 注意：SQLite 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS
--- 所以我们先检查是否存在 openid 列
 
 -- 哇哇笑收藏表
 CREATE TABLE IF NOT EXISTS favorites (
@@ -151,4 +124,17 @@ CREATE TABLE IF NOT EXISTS favorites (
     UNIQUE(joke_id, openid)
 );
 
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_shopping_family ON shopping_items(family_id);
+CREATE INDEX IF NOT EXISTS idx_shopping_status ON shopping_items(status);
+CREATE INDEX IF NOT EXISTS idx_todo_family ON todos(family_id);
+CREATE INDEX IF NOT EXISTS idx_todo_status ON todos(status);
+CREATE INDEX IF NOT EXISTS idx_schedule_family ON schedules(family_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_date ON schedules(schedule_date);
+CREATE INDEX IF NOT EXISTS idx_family_members ON family_members(family_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
+CREATE INDEX IF NOT EXISTS idx_game_ranks_game ON game_ranks(game_id);
+CREATE INDEX IF NOT EXISTS idx_game_ranks_score ON game_ranks(game_id, score DESC);
+CREATE INDEX IF NOT EXISTS idx_game_ranks_user ON game_ranks(game_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_openid ON favorites(openid);

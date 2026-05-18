@@ -136,8 +136,8 @@ router.get('/:familyId', authMiddleware, (req, res) => {
     const baseUrl = 'https://api.yanten.top';
     const cleanedMembers = members.map(m => ({
       ...m,
-      avatar: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar ? baseUrl + m.avatar : ''),
-      avatarUrl: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar ? baseUrl + m.avatar : '')
+      avatar: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar && m.avatar.startsWith('http') ? m.avatar : (m.avatar ? baseUrl + m.avatar : '')),
+      avatarUrl: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar && m.avatar.startsWith('http') ? m.avatar : (m.avatar ? baseUrl + m.avatar : ''))
     }));
 
     res.json({

@@ -98,8 +98,8 @@ async function handleLogin(openid, res) {
       user: {
         id: user.id,
         nickname: user.nickname,
-        avatar: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar ? baseUrl + user.avatar : ''),
-        avatarUrl: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar ? baseUrl + user.avatar : ''),  // 兼容前端
+        avatar: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar && user.avatar.startsWith('http') ? user.avatar : (user.avatar ? baseUrl + user.avatar : '')),
+        avatarUrl: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar && user.avatar.startsWith('http') ? user.avatar : (user.avatar ? baseUrl + user.avatar : '')),  // 兼容前端
 
         name: user.nickname,
         role: user.role
@@ -154,7 +154,7 @@ router.get('/user', authMiddleware, (req, res) => {
     data: {
       ...user,
       name: user.nickname,
-      avatarUrl: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar ? baseUrl + user.avatar : ''),  // 兼容前端
+      avatarUrl: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar && user.avatar.startsWith('http') ? user.avatar : (user.avatar ? baseUrl + user.avatar : '')),  // 兼容前端
       families,
       familyInfo: families[0] || null
     }
