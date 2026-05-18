@@ -136,7 +136,8 @@ router.get('/:familyId', authMiddleware, (req, res) => {
     `).all(familyId);
     
     // 清理失效的 cloud:// URL，构建完整可访问 URL
-    const baseUrl = 'https://api.yanten.top';
+    const config = require('../../config/default');
+const baseUrl = config.baseUrl;
     const cleanedMembers = members.map(m => ({
       ...m,
       avatar: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar && m.avatar.startsWith('http') ? m.avatar : (m.avatar ? baseUrl + m.avatar : '')),

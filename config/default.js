@@ -25,5 +25,5 @@ module.exports = {
   },
   
   // 服务地址
-  serverUrl: process.env.SERVER_URL || 'http://localhost:3000',
+  baseUrl: process.env.BASE_URL || 'https://api.yanten.top',
 };

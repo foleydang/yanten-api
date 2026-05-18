@@ -1,5 +1,5 @@
 /**
- * 路由文件: /root/github/yanten-api/src/routes/$f
+ * 笑话管理后台 - 审核/删除/统计
  */
 const express = require('express');
 const router = express.Router();

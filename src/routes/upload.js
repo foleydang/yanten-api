@@ -1,5 +1,5 @@
 /**
- * 路由文件: /root/github/yanten-api/src/routes/$f
+ * 文件上传 - 头像/反馈图片
  */
 const express = require('express');
 const multer = require('multer');

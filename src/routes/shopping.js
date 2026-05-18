@@ -1,5 +1,5 @@
 /**
- * 路由文件: /root/github/yanten-api/src/routes/$f
+ * 购物清单路由 - 添加/删除/标记完成/分类查询
  */
 const express = require('express');
 const { getDb } = require('../utils/database');
@@ -252,9 +252,10 @@ router.get('/categories', (req, res) => {
     success: true,
     data: [
       { id: 'food', name: '🥬 食品', icon: '🥬' },
+      { id: 'fresh', name: '🥩 生鲜', icon: '🥩' },
       { id: 'daily', name: '🧴 日用品', icon: '🧴' },
       { id: 'clothing', name: '👕 服饰', icon: '👕' },
-      { id: 'medicine', name: '💊 医药', icon: '💊' },
+      { id: 'electronics', name: '📱 电器', icon: '📱' },
       { id: 'other', name: '📦 其他', icon: '📦' }
     ]
   });

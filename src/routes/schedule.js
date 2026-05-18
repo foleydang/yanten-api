@@ -1,5 +1,5 @@
 /**
- * 路由文件: /root/github/yanten-api/src/routes/$f
+ * 日程安排 - 添加/删除/查询/按日期筛选
  */
 const express = require('express');
 const { getDb } = require('../utils/database');

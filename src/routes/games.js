@@ -6,6 +6,7 @@
  */
 const express = require('express');
 const router = express.Router();
+const config = require('../../config/default');
 const { getDb } = require('../utils/database');
 
 // 排行榜缓存
@@ -40,7 +41,7 @@ router.get('/rank/:gameId', (req, res) => {
       LIMIT ?
     `).all(gameId, limit);
 
-    const baseUrl = 'https://api.yanten.top';
+    const baseUrl = config.baseUrl;
     const data = results.map((row, index) => ({
       rank: index + 1,
       score: row.score,
@@ -131,7 +132,7 @@ router.get('/rank/:gameId/my-best', (req, res) => {
     `).get(gameId, openid);
 
     if (result) {
-      const baseUrl = 'https://api.yanten.top';
+      const baseUrl = config.baseUrl;
       res.json({
         success: true,
         data: {

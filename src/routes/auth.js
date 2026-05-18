@@ -1,11 +1,11 @@
 /**
- * 路由文件: /root/github/yanten-api/src/routes/$f
+ * 用户认证 - 微信登录/注册/个人信息
  */
-const baseUrl = 'https://api.yanten.top';
+const config = require('../../config/default');
+const baseUrl = config.baseUrl;
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
-const config = require('../../config/default');
 const { getDb } = require('../utils/database');
 const { authMiddleware } = require('../middleware/auth');
 
