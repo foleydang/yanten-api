@@ -214,10 +214,4 @@ router.get('/stats', authMiddleware, (req, res) => {
 });
 
 // 测试登录（开发环境）
-router.post('/dev-login', (req, res) => {
-  const { userId } = req.body;
-  const mockOpenid = 'dev_' + (userId || Date.now());
-  return handleLogin(mockOpenid, res);
-});
-
 module.exports = router;
