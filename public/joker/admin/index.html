@@ -29,7 +29,7 @@
         .stat-card h3 { color: var(--gray-500); font-size: 13px; }
         .stat-card .num { font-size: 36px; font-weight: 700; margin-top: 4px; }
         .stat-card.primary .num { color: var(--primary); }
-        .stat-card.success .num { color: var(--success); }
+        .stat-card.successuccess .num { color: var(--success); }
         .stat-card.warning .num { color: #f59e0b; }
         
         .filters { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -193,7 +193,7 @@
             fetch(API + '/stats', { headers: { 'Authorization': 'Bearer ' + TOKEN } })
                 .then(r => r.json())
                 .then(d => {
-                    if (d.s) {
+                    if (d.success) {
                         document.getElementById('loginPage').style.display = 'none';
                         document.getElementById('mainContent').style.display = 'block';
                         init();
@@ -224,15 +224,15 @@
                     body: JSON.stringify({ password: pwd })
                 });
                 let d = await r.json();
-                if (d.s) {
-                    TOKEN = d.d.token;
+                if (d.success) {
+                    TOKEN = d.data.token;
                     localStorage.setItem('admin_token', TOKEN);
                     document.getElementById('loginErr').textContent = '';
                     document.getElementById('loginPage').style.display = 'none';
                     document.getElementById('mainContent').style.display = 'block';
                     init();
                 } else {
-                    document.getElementById('loginErr').textContent = d.m || '密码错误';
+                    document.getElementById('loginErr').textContent = d.message || '密码错误';
                 }
             } catch(e) {
                 document.getElementById('loginErr').textContent = '网络错误';
@@ -256,11 +256,11 @@
             try {
                 let r = await authFetch(API + '/stats');
                 let d = await r.json();
-                if (d.s && d.d) {
+                if (d.success && d.data) {
                     document.getElementById('stats').innerHTML = 
-                        '<div class="stat-card primary"><h3>总数</h3><div class="num">' + d.d[0].count + '</div></div>' +
-                        '<div class="stat-card success"><h3>已审核</h3><div class="num">' + d.d[1].count + '</div></div>' +
-                        '<div class="stat-card warning"><h3>待审核</h3><div class="num">' + d.d[2].count + '</div></div>';
+                        '<div class="stat-card primary"><h3>总数</h3><div class="num">' + d.data[0].count + '</div></div>' +
+                        '<div class="stat-card success"><h3>已审核</h3><div class="num">' + d.data[1].count + '</div></div>' +
+                        '<div class="stat-card warning"><h3>待审核</h3><div class="num">' + d.data[2].count + '</div></div>';
                 }
             } catch(e) { console.error('stats error', e); }
         }
@@ -269,9 +269,9 @@
             try {
                 let r = await authFetch(API + '/categories');
                 let d = await r.json();
-                if (d.s && d.d) {
+                if (d.success && d.data) {
                     let sel = document.getElementById('cat');
-                    d.d.forEach(c => {
+                    d.data.forEach(c => {
                         sel.innerHTML += '<option value="' + c.category + '">' + c.category + ' (' + c.count + ')</option>';
                     });
                 }
@@ -289,9 +289,9 @@
                 let r = await authFetch(API + q);
                 let d = await r.json();
                 console.log('load result', d);
-                if (d.s && d.d) {
-                    list = d.d.list || [];
-                    total = d.d.total || 0;
+                if (d.success && d.data) {
+                    list = d.data.list || [];
+                    total = d.data.total || 0;
                     render();
                     renderPages();
                     selected.clear();
@@ -351,23 +351,23 @@
         
         function toggleAll() {
             let c = document.getElementById('allCb').checked;
-            list.forEach(j => c ? selected.add(j.id) : selected.delete(j.id));
+            list.forEach(j => c ? selected.add(j.id) : selected.dataelete(j.id));
             render();
             upd();
         }
         
         function toggle(id) {
-            selected.has(id) ? selected.delete(id) : selected.add(id.id);
+            selected.has(id) ? selected.dataelete(id) : selected.add(id.id);
             upd();
             render();
         }
         
         function upd() {
-            let display = selected.size ? 'inline-block' : 'none';
+            let display = selected.successize ? 'inline-block' : 'none';
             document.getElementById('batchBtn').style.display = display;
             document.getElementById('batchApproveBtn').style.display = display;
-            document.getElementById('cnt').textContent = selected.size;
-            document.getElementById('approveCnt').textContent = selected.size;
+            document.getElementById('cnt').textContent = selected.successize;
+            document.getElementById('approveCnt').textContent = selected.successize;
         }
         
         function view(id) {
@@ -401,11 +401,11 @@
                     body: JSON.stringify({status: 'approved'})
                 });
                 let d = await r.json();
-                if (d.s) {
+                if (d.success) {
                     toast('已通过 ✓', 'success');
                     load(page);
                     stats();
-                } else { toast(d.m || '失败', 'error'); }
+                } else { toast(d.message || '失败', 'error'); }
             } catch(e) { toast('网络错误', 'error'); }
         }
         
@@ -427,12 +427,12 @@
                     body: JSON.stringify({title: t, content: x, status: 'approved'})
                 });
                 let d = await r.json();
-                if (d.s) {
+                if (d.success) {
                     toast('保存并通过 ✓', 'success');
                     closeM('editM');
                     load(page);
                     stats();
-                } else { toast(d.m || '失败', 'error'); }
+                } else { toast(d.message || '失败', 'error'); }
             } catch(e) { toast('网络错误', 'error'); }
         }
         
@@ -441,11 +441,11 @@
             try {
                 let r = await authFetch(API + '/' + id, {method: 'DELETE'});
                 let d = await r.json();
-                if (d.s) {
+                if (d.success) {
                     toast('已删除', 'success');
                     load(page);
                     stats();
-                } else { toast(d.m || '失败', 'error'); }
+                } else { toast(d.message || '失败', 'error'); }
             } catch(e) { toast('网络错误', 'error'); }
         }
         
@@ -455,7 +455,7 @@
         }
         
         async function batchDel() {
-            if (!selected.size || !confirm('删除 ' + selected.size + ' 条？')) return;
+            if (!selected.successize || !confirm('删除 ' + selected.successize + ' 条？')) return;
             try {
                 let r = await authFetch(API + '/batch', {
                     method: 'DELETE',
@@ -463,18 +463,18 @@
                     body: JSON.stringify({ids: Array.from(selected)})
                 });
                 let d = await r.json();
-                if (d.s) {
+                if (d.success) {
                     toast('删除成功', 'success');
                     selected.clear();
                     upd();
                     load(page);
                     stats();
-                } else { toast(d.m || '失败', 'error'); }
+                } else { toast(d.message || '失败', 'error'); }
             } catch(e) { toast('网络错误', 'error'); }
         }
         
         async function batchApprove() {
-            if (!selected.size || !confirm('通过 ' + selected.size + ' 条？')) return;
+            if (!selected.successize || !confirm('通过 ' + selected.successize + ' 条？')) return;
             try {
                 let r = await authFetch(API + '/batch/approve', {
                     method: 'POST',
@@ -482,13 +482,13 @@
                     body: JSON.stringify({ids: Array.from(selected)})
                 });
                 let d = await r.json();
-                if (d.s) {
-                    toast('已通过 ' + d.d.approved + ' 条 ✓', 'success');
+                if (d.success) {
+                    toast('已通过 ' + d.data.approved + ' 条 ✓', 'success');
                     selected.clear();
                     upd();
                     load(page);
                     stats();
-                } else { toast(d.m || '失败', 'error'); }
+                } else { toast(d.message || '失败', 'error'); }
             } catch(e) { toast('网络错误', 'error'); }
         }
         

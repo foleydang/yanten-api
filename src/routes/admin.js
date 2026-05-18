@@ -35,12 +35,12 @@ router.get('/stats', (req, res) => {
     const total = db.prepare('SELECT COUNT(*) as count FROM jokes').get()?.count || 0;
     const approved = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved"').get()?.count || 0;
     const pending = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="pending"').get()?.count || 0;
-    res.json({s: true, d: [
+    res.json({success: true, data: [
       {category: '总数', count: total},
       {category: '已审核', count: approved},
       {category: '待审核', count: pending}
     ]});
-  } catch (e) { res.json({s: false, m: e.message}); }
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 // 分类统计
@@ -48,8 +48,8 @@ router.get('/categories', (req, res) => {
   try {
     const db = getDb();
     const results = db.prepare('SELECT category, COUNT(*) as count FROM jokes GROUP BY category ORDER BY COUNT(*) DESC').all();
-    res.json({s: true, d: results});
-  } catch (e) { res.json({s: false, m: e.message}); }
+    res.json({success: true, data: results});
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 // 列表
@@ -84,8 +84,8 @@ router.get('/', (req, res) => {
     const total = db.prepare(`SELECT COUNT(*) as count FROM jokes ${whereClause}`).get(...params)?.count || 0;
     const list = db.prepare(`SELECT id, category, title, content, status FROM jokes ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
     
-    res.json({s: true, d: {list, total}});
-  } catch (e) { res.json({s: false, m: e.message}); }
+    res.json({success: true, data: {list, total}});
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 // 更新
@@ -97,16 +97,16 @@ router.put('/:id', (req, res) => {
     
     if (status && !title && !content) {
       db.prepare('UPDATE jokes SET status=? WHERE id=?').run(status, id);
-      return res.json({s: true});
+      return res.json({success: true});
     }
     
     if (title && content) {
       db.prepare('UPDATE jokes SET title=?, content=?, status="approved" WHERE id=?').run(title, content, id);
-      return res.json({s: true});
+      return res.json({success: true});
     }
     
-    res.json({s: false, m: '参数错误'});
-  } catch (e) { res.json({s: false, m: e.message}); }
+    res.json({success: false, message: '参数错误'});
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 // 删除
@@ -114,8 +114,8 @@ router.delete('/:id', (req, res) => {
   try {
     const db = getDb();
     db.prepare('DELETE FROM jokes WHERE id=?').run(parseInt(req.params.id));
-    res.json({s: true});
-  } catch (e) { res.json({s: false, m: e.message}); }
+    res.json({success: true});
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 // 批量删除
@@ -123,15 +123,15 @@ router.delete('/batch', (req, res) => {
   try {
     const db = getDb();
     const {ids} = req.body;
-    if (!ids?.length) return res.json({s: false, m: '无选中'});
+    if (!ids?.length) return res.json({success: false, message: '无选中'});
     
     const validIds = ids.map(id => parseInt(id)).filter(id => id > 0);
-    if (validIds.length !== ids.length) return res.json({s: false, m: '参数错误'});
+    if (validIds.length !== ids.length) return res.json({success: false, message: '参数错误'});
     
     const placeholders = validIds.map(() => '?').join(',');
     db.prepare(`DELETE FROM jokes WHERE id IN (${placeholders})`).run(...validIds);
-    res.json({s: true, d: {deleted: validIds.length}});
-  } catch (e) { res.json({s: false, m: e.message}); }
+    res.json({success: true, data: {deleted: validIds.length}});
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 // 批量通过
@@ -139,15 +139,15 @@ router.post('/batch/approve', (req, res) => {
   try {
     const db = getDb();
     const {ids} = req.body;
-    if (!ids?.length) return res.json({s: false, m: '无选中'});
+    if (!ids?.length) return res.json({success: false, message: '无选中'});
     
     const validIds = ids.map(id => parseInt(id)).filter(id => id > 0);
-    if (validIds.length !== ids.length) return res.json({s: false, m: '参数错误'});
+    if (validIds.length !== ids.length) return res.json({success: false, message: '参数错误'});
     
     const placeholders = validIds.map(() => '?').join(',');
     db.prepare(`UPDATE jokes SET status="approved" WHERE id IN (${placeholders})`).run(...validIds);
-    res.json({s: true, d: {approved: validIds.length}});
-  } catch (e) { res.json({s: false, m: e.message}); }
+    res.json({success: true, data: {approved: validIds.length}});
+  } catch (e) { res.json({success: false, message: e.message}); }
 });
 
 module.exports = router;
