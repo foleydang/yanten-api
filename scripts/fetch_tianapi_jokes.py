@@ -99,8 +99,10 @@ def cleanup_bad_jokes():
     conn.close()
 
 def main():
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
     print("=" * 50)
-    print("获取天行API笑话 - 先清理差评，再新增")
+    print(f"获取天行API笑话 - {now}")
+    print("规则：先删差评(👎≥3且👎>👍)，再新增")
     print("=" * 50)
     
     # Step 1: 清理差评笑话
@@ -139,14 +141,14 @@ def main():
     
     print("=" * 50)
     # Step 3: 重启服务让数据库生效（因为Node用sql.js内存数据库，不自动读取文件变更）
-    if total > 0:
-        print("\nStep 3: 重启服务使数据生效")
-        import subprocess
-        subprocess.run(['pm2', 'restart', 'yanten-api'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("  服务已重启")
+    # 无论是否新增，只要删除了差评也需要重启
+    import subprocess
+    print("\nStep 3: 重启服务使数据生效")
+    subprocess.run(['pm2', 'restart', 'yanten-api'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("  服务已重启")
     
     print("=" * 50)
-    print(f"完成！共新增 {total} 条笑话")
+    print(f"完成！新增 {total} 条笑话")
     print("状态：approved（自动通过）")
     print("=" * 50)
 
