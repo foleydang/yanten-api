@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-直接获取天行API笑话并保存到数据库
-不做任何过滤或截断检查，让用户自己审核
+获取天行API笑话并保存到数据库
+新增笑话自动approved，写入后重启服务使数据生效
 """
 import requests
 import json
@@ -57,10 +57,10 @@ def save_jokes(jokes):
             print(f"    跳过重复: {title[:20]}...")
             continue
         
-        # 直接插入，不做任何修改
+        # 直接插入，自动approved
         cursor.execute("""
             INSERT INTO jokes (id, category, title, content, likes, status, date)
-            VALUES (?, '搞笑', ?, ?, 0, 'pending', ?)
+            VALUES (?, '搞笑', ?, ?, 0, 'approved', ?)
         """, (next_id, title, content, today))
         
         print(f"    新增 #{next_id}: {title[:30]}...")
@@ -138,9 +138,16 @@ def main():
         print(f"  神回复: 错误 - {e}")
     
     print("=" * 50)
+    # Step 3: 重启服务让数据库生效（因为Node用sql.js内存数据库，不自动读取文件变更）
+    if total > 0:
+        print("\nStep 3: 重启服务使数据生效")
+        import subprocess
+        subprocess.run(['pm2', 'restart', 'yanten-api'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print("  服务已重启")
+    
+    print("=" * 50)
     print(f"完成！共新增 {total} 条笑话")
-    print("状态：pending（待审核）")
-    print("请到管理后台审核：https://yanten.top/joker/admin")
+    print("状态：approved（自动通过）")
     print("=" * 50)
 
 if __name__ == "__main__":
