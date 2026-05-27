@@ -4,3 +4,6 @@ node_modules/
 # 日志文件
 *.log
 .DS_Store
+
+# 数据库文件（不应入库，会膨胀 git history）
+data/database/*.db
