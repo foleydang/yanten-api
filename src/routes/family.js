@@ -12,7 +12,7 @@ const router = express.Router();
 function buildAvatarUrl(avatar) {
   if (!avatar) return '';
   if (avatar.startsWith('cloud://')) return '';
-  if (avatar.startsWith('http')) return avatar;
+  if (avatar.startsWith('http')) return avatar.includes('?') ? avatar : avatar + '?_t=' + Date.now();
   return config.baseUrl + avatar;
 }
 
