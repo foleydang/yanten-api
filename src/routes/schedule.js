@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const { getDb } = require('../utils/database');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, familyMemberMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -112,7 +112,7 @@ router.get('/month/:year/:month', authMiddleware, (req, res) => {
 });
 
 // 添加日程
-router.post('/add', authMiddleware, (req, res) => {
+router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
   const db = getDb();
   // 兼容两种字段名
   const { familyId, title, description, scheduleDate, scheduleTime, date, time, type, remindBefore, remind, repeatType } = req.body;
@@ -143,15 +143,13 @@ router.post('/add', authMiddleware, (req, res) => {
       req.userId
     );
     
-    // 获取刚插入的日程
-    const schedules = db.prepare(`
+    // 用 lastInsertRowid 精确查询，避免并发问题
+    const schedule = db.prepare(`
       SELECT s.*, u.nickname as created_by_name
       FROM schedules s
       LEFT JOIN users u ON s.created_by = u.id
-      ORDER BY s.id DESC LIMIT 1
-    `).all();
-    
-    const schedule = schedules[0];
+      WHERE s.id = ?
+    `).get(result.lastInsertRowid);
     
     res.json({
       success: true,
@@ -176,6 +174,16 @@ router.put('/:id', authMiddleware, (req, res) => {
   const dateValue = scheduleDate || date;
   const timeValue = scheduleTime || time;
   const remindValue = remindBefore || remind || 1;
+  
+  // 校验：用户必须是该日程所属家庭的成员
+  const sched = db.prepare('SELECT family_id FROM schedules WHERE id = ?').get(id);
+  if (!sched) {
+    return res.status(404).json({ success: false, message: '日程不存在' });
+  }
+  const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(sched.family_id, req.userId);
+  if (!member) {
+    return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+  }
   
   try {
     db.prepare(`
@@ -219,6 +227,16 @@ router.delete('/:id', authMiddleware, (req, res) => {
   const db = getDb();
   const { id } = req.params;
   
+  // 校验：用户必须是该日程所属家庭的成员
+  const sched = db.prepare('SELECT family_id FROM schedules WHERE id = ?').get(id);
+  if (!sched) {
+    return res.status(404).json({ success: false, message: '日程不存在' });
+  }
+  const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(sched.family_id, req.userId);
+  if (!member) {
+    return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+  }
+  
   try {
     db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
     
@@ -235,7 +253,7 @@ router.delete('/:id', authMiddleware, (req, res) => {
   }
 });
 
-// 获取日程类型列表
+// 获取日程类型列表（静态数据，无需认证）
 router.get('/types', (req, res) => {
   res.json({
     success: true,

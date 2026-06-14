@@ -4,6 +4,15 @@
  * - 排行榜提交只需 openid，昵称从 users 表自动获取
  * - 支持排行榜查询、成绩提交、最佳成绩查询
  */
+// openid 合法性校验
+function isValidOpenid(openid) {
+  if (!openid) return false;
+  if (openid.length > 100) return false;
+  if (/[;'"\-\-\/\*\n\r]/.test(openid)) return false;
+  if (/union|select|insert|delete|drop|sleep|jndi|ldap|rmi/i.test(openid)) return false;
+  return true;
+}
+
 const express = require('express');
 const router = express.Router();
 const config = require('../../config/default');
@@ -69,7 +78,7 @@ router.post('/rank/:gameId', (req, res) => {
     if (!score || score <= 0) {
       return res.json({ success: false, message: '无效分数' });
     }
-    if (!openid) {
+    if (!openid || !isValidOpenid(openid)) {
       return res.json({ success: false, message: '缺少 openid' });
     }
 
@@ -116,7 +125,7 @@ router.get('/rank/:gameId/my-best', (req, res) => {
     const { gameId } = req.params;
     const { openid } = req.query;
 
-    if (!openid) return res.json({ success: true, data: null });
+    if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: null });
 
     const db = getDb();
     const sort = gameId === 'memory' ? 'asc' : 'desc';

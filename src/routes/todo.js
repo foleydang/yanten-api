@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const { getDb } = require('../utils/database');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, familyMemberMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -75,7 +75,7 @@ router.get('/list', authMiddleware, (req, res) => {
 });
 
 // 添加待办
-router.post('/add', authMiddleware, (req, res) => {
+router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
   const db = getDb();
   // 兼容两种字段名
   const { familyId, title, description, dueDate, assigneeId, assignee, priority } = req.body;
@@ -140,7 +140,15 @@ router.put('/:id/status', authMiddleware, (req, res) => {
   }
   
   try {
-    const doneAt = status === 'done' ? "datetime('now')" : null;
+    // 校验：用户必须是该待办所属家庭的成员
+    const todo = db.prepare('SELECT family_id FROM todos WHERE id = ?').get(id);
+    if (!todo) {
+      return res.status(404).json({ success: false, message: '待办不存在' });
+    }
+    const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(todo.family_id, req.userId);
+    if (!member) {
+      return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+    }
     
     if (status === 'done') {
       db.prepare(`
@@ -175,6 +183,16 @@ router.put('/:id', authMiddleware, (req, res) => {
   // 兼容两种字段名
   const { title, description, dueDate, assigneeId, assignee, priority } = req.body;
   const assigneeValue = assigneeId || assignee;
+  
+  // 校验：用户必须是该待办所属家庭的成员
+  const todo = db.prepare('SELECT family_id FROM todos WHERE id = ?').get(id);
+  if (!todo) {
+    return res.status(404).json({ success: false, message: '待办不存在' });
+  }
+  const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(todo.family_id, req.userId);
+  if (!member) {
+    return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+  }
   
   try {
     db.prepare(`
@@ -219,6 +237,16 @@ router.delete('/:id', authMiddleware, (req, res) => {
   const db = getDb();
   const { id } = req.params;
   
+  // 校验：用户必须是该待办所属家庭的成员
+  const todo = db.prepare('SELECT family_id FROM todos WHERE id = ?').get(id);
+  if (!todo) {
+    return res.status(404).json({ success: false, message: '待办不存在' });
+  }
+  const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(todo.family_id, req.userId);
+  if (!member) {
+    return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+  }
+  
   try {
     db.prepare('DELETE FROM todos WHERE id = ?').run(id);
     
@@ -236,7 +264,7 @@ router.delete('/:id', authMiddleware, (req, res) => {
 });
 
 // 清空已完成待办
-router.delete('/clear-done/:familyId', authMiddleware, (req, res) => {
+router.delete('/clear-done/:familyId', authMiddleware, familyMemberMiddleware, (req, res) => {
   const db = getDb();
   const { familyId } = req.params;
   

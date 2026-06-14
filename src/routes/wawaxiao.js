@@ -45,7 +45,7 @@ router.get('/favorites', (req, res) => {
     ensureFavoritesTable();
     const db = getDb();
     const { openid, page = 1, limit = 50 } = req.query;
-    if (!openid) return res.json({ success: true, data: { list: [], total: 0 } });
+    if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: { list: [], total: 0 } });
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const results = db.prepare(`SELECT j.id, j.title, j.content, j.category, j.likes, j.shares, j.neutrals, j.dislikes, f.created_at as fav_at FROM favorites f JOIN jokes j ON f.joke_id = j.id WHERE f.openid = ? AND j.status = 'approved' ORDER BY f.created_at DESC LIMIT ? OFFSET ?`).all(openid, parseInt(limit), offset);
     const favorites = results.map(row => ({ id: row.id, title: row.title, content: row.content, category: row.category || '搞笑', likes: row.likes || 0, shares: row.shares || 0, neutrals: row.neutrals || 0, dislikes: row.dislikes || 0, favAt: row.fav_at || '' }));
@@ -61,7 +61,7 @@ router.post('/favorites/:id', (req, res) => {
     const db = getDb();
     const jokeId = parseInt(req.params.id);
     const { openid } = req.body;
-    if (!openid) return res.json({ success: false, message: '缺少 openid' });
+    if (!openid || !isValidOpenid(openid)) return res.json({ success: false, message: '缺少 openid' });
     const joke = db.prepare('SELECT id FROM jokes WHERE id=? AND status="approved"').get(jokeId);
     if (!joke) return res.json({ success: false, message: '笑话不存在' });
     const existing = db.prepare('SELECT id FROM favorites WHERE joke_id=? AND openid=?').get(jokeId, openid);
@@ -78,7 +78,7 @@ router.delete('/favorites/:id', (req, res) => {
     const db = getDb();
     const jokeId = parseInt(req.params.id);
     const { openid } = req.query;
-    if (!openid) return res.json({ success: false, message: '缺少 openid' });
+    if (!openid || !isValidOpenid(openid)) return res.json({ success: false, message: '缺少 openid' });
     db.prepare('DELETE FROM favorites WHERE joke_id=? AND openid=?').run(jokeId, openid);
     res.json({ success: true });
   } catch (e) { res.json({ success: false, message: e.message }); }
@@ -90,7 +90,7 @@ router.get('/favorites/check', (req, res) => {
     ensureFavoritesTable();
     const db = getDb();
     const { openid, ids } = req.query;
-    if (!openid) return res.json({ success: true, data: {} });
+    if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: {} });
     let idsArr = ids ? ids.split(',').map(id => parseInt(id)).filter(id => id > 0) : [];
     if (idsArr.length === 0) return res.json({ success: true, data: {} });
     const placeholders = idsArr.map(() => '?').join(',');
@@ -110,6 +110,7 @@ router.post('/submit', (req, res) => {
     const db = getDb();
     const { title, content, category, openid } = req.body;
     if (!title || !content) return res.json({ success: false, message: '标题和内容不能为空' });
+    if (openid && !isValidOpenid(openid)) return res.json({ success: false, message: '无效的用户标识' });
     if (title.length > 50) return res.json({ success: false, message: '标题不能超过50字' });
     if (content.length > 500) return res.json({ success: false, message: '内容不能超过500字' });
     
@@ -139,7 +140,7 @@ router.get('/submit/mine', (req, res) => {
     ensureSubmitColumns();
     const db = getDb();
     const { openid } = req.query;
-    if (!openid) return res.json({ success: true, data: { list: [], total: 0 } });
+    if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: { list: [], total: 0 } });
     const results = db.prepare('SELECT id, title, content, category, status, date FROM jokes WHERE submitter=? ORDER BY id DESC LIMIT 20').all(openid);
     const list = results.map(row => ({ id: row.id, title: row.title, content: row.content, category: row.category || '搞笑', status: row.status, date: row.date || '' }));
     res.json({ success: true, data: { list, total: list.length } });
@@ -178,13 +179,22 @@ router.get('/latest', (req, res) => {
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
-// 获取随机笑话
+// openid 合法性校验（防止 SQL注入等恶意输入）
+function isValidOpenid(openid) {
+  if (!openid) return false;
+  // 合法 openid 格式：微信 oKMOe5* 开头，或开发测试 dev_/wx_/user_ 开头
+  // 不允许包含 SQL关键词、特殊字符、超长字符串
+  if (openid.length > 100) return false;
+  if (/[;'"\-\-\/\*\n\r]/.test(openid)) return false;
+  if (/union|select|insert|delete|drop|sleep|jndi|ldap|rmi/i.test(openid)) return false;
+  return true;
+}
+
+// 获取随机笑话（使用 ORDER BY RANDOM() 保证均匀分布）
 router.get('/random', (req, res) => {
   try {
     const db = getDb();
-    const total = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved"').get()?.count || 0;
-    const randomId = Math.floor(Math.random() * total) + 1;
-    const joke = db.prepare('SELECT id, title, content, category FROM jokes WHERE id >= ? AND status="approved" LIMIT 1').get(randomId);
+    const joke = db.prepare('SELECT id, title, content, category FROM jokes WHERE status="approved" ORDER BY RANDOM() LIMIT 1').get();
     if (joke) res.json({ success: true, data: { id: joke.id, title: joke.title, content: joke.content, category: joke.category || '搞笑' } });
     else res.json({ success: true, data: null });
   } catch (e) { res.json({ success: false, message: e.message }); }
@@ -226,7 +236,7 @@ router.post('/like/:id', (req, res) => {
     const id = parseInt(req.params.id);
     const { openid } = req.body;
     db.prepare('UPDATE jokes SET likes = likes + 1 WHERE id=?').run(id);
-    if (openid) {
+    if (openid && isValidOpenid(openid)) {
       try { db.prepare('INSERT INTO favorites (joke_id, openid) VALUES (?, ?)').run(id, openid); } catch (e) {}
     }
     const row = db.prepare('SELECT likes, neutrals, dislikes FROM jokes WHERE id=?').get(id);

@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const { getDb } = require('../utils/database');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, familyMemberMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -72,7 +72,7 @@ router.get('/list', authMiddleware, (req, res) => {
 });
 
 // 添加购物项
-router.post('/add', authMiddleware, (req, res) => {
+router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
   const db = getDb();
   const { familyId, title, category, quantity, unit, priority } = req.body;
   
@@ -122,7 +122,17 @@ router.post('/add', authMiddleware, (req, res) => {
 router.put('/:id', authMiddleware, (req, res) => {
   const db = getDb();
   const { id } = req.params;
-  const { title, category, quantity, unit, priority } = req.body;
+  const { title, category, quantity, unit, priority, familyId } = req.body;
+  
+  // 校验：用户必须是该购物项所属家庭的成员
+  const item = db.prepare('SELECT family_id FROM shopping_items WHERE id = ?').get(id);
+  if (!item) {
+    return res.status(404).json({ success: false, message: '项目不存在' });
+  }
+  const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(item.family_id, req.userId);
+  if (!member) {
+    return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+  }
   
   try {
     db.prepare(`
@@ -138,11 +148,11 @@ router.put('/:id', authMiddleware, (req, res) => {
       id
     );
     
-    const item = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(id);
+    const updated = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(id);
     
     res.json({
       success: true,
-      data: item,
+      data: updated,
       message: '更新成功'
     });
   } catch (error) {
@@ -167,6 +177,12 @@ router.put('/:id/toggle', authMiddleware, (req, res) => {
         success: false, 
         message: '项目不存在' 
       });
+    }
+    
+    // 校验：用户必须是该购物项所属家庭的成员
+    const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(item.family_id, req.userId);
+    if (!member) {
+      return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
     }
     
     if (item.status === 'pending') {
@@ -210,6 +226,16 @@ router.delete('/:id', authMiddleware, (req, res) => {
   const { id } = req.params;
   
   try {
+    // 校验：用户必须是该购物项所属家庭的成员
+    const item = db.prepare('SELECT family_id FROM shopping_items WHERE id = ?').get(id);
+    if (!item) {
+      return res.status(404).json({ success: false, message: '项目不存在' });
+    }
+    const member = db.prepare('SELECT id FROM family_members WHERE family_id = ? AND user_id = ?').get(item.family_id, req.userId);
+    if (!member) {
+      return res.status(403).json({ success: false, message: '无权操作该家庭数据' });
+    }
+    
     db.prepare('DELETE FROM shopping_items WHERE id = ?').run(id);
     
     res.json({
@@ -226,7 +252,7 @@ router.delete('/:id', authMiddleware, (req, res) => {
 });
 
 // 清空已完成的项
-router.delete('/clear-done/:familyId', authMiddleware, (req, res) => {
+router.delete('/clear-done/:familyId', authMiddleware, familyMemberMiddleware, (req, res) => {
   const db = getDb();
   const { familyId } = req.params;
   
@@ -246,7 +272,7 @@ router.delete('/clear-done/:familyId', authMiddleware, (req, res) => {
   }
 });
 
-// 获取分类列表（公开，无需认证）
+// 获取分类列表（静态数据，无需认证）
 router.get('/categories', (req, res) => {
   res.json({
     success: true,

@@ -1,12 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const config = require('../config/default');
 const { initDatabase, getDb } = require('./utils/database');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware, familyMemberMiddleware } = require('./middleware/auth');
 const { apiLimiter, strictLimiter, jokeLimiter } = require('./middleware/rateLimit');
+const securityHeaders = require('./middleware/securityHeaders');
+const requestLogger = require('./middleware/requestLogger');
 
 // 路由
 const authRoutes = require('./routes/auth');
@@ -46,6 +49,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// 安全中间件
+app.use(securityHeaders);
+app.use(requestLogger);
+
 // 静态文件
 app.use('/static', express.static(path.join(__dirname, '../public')));
 
@@ -55,7 +62,7 @@ app.use('/api/', apiLimiter);
 // 路由
 app.use('/api/auth', strictLimiter, authRoutes);
 app.use('/api/family', authMiddleware, familyRoutes);
-app.use('/api/shopping', shoppingRoutes);
+app.use('/api/shopping', authMiddleware, shoppingRoutes);
 app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
@@ -88,6 +95,18 @@ app.get('/api/user/stats', authMiddleware, (req, res) => {
 app.get('/api/health', (req, res) => {
   const uptime = process.uptime();
   const memory = process.memoryUsage();
+  
+  // 动态获取数据库文件大小
+  let dbSize = 'N/A';
+  try {
+    const dbPath = path.resolve(config.database.path);
+    const stats = fs.statSync(dbPath);
+    const sizeKB = Math.round(stats.size / 1024);
+    dbSize = sizeKB < 1024 ? `${sizeKB}KB` : `${Math.round(sizeKB / 1024)}MB`;
+  } catch (e) {
+    dbSize = 'N/A';
+  }
+  
   res.json({
     status: 'ok',
     message: '家庭备忘录服务运行正常 ❤️',
@@ -97,7 +116,7 @@ app.get('/api/health', (req, res) => {
       used: Math.round(memory.heapUsed / 1024 / 1024) + 'MB',
       total: Math.round(memory.heapTotal / 1024 / 1024) + 'MB'
     },
-    database: { connected: true, size: '88KB' },
+    database: { connected: true, size: dbSize },
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0',
     timestamp: new Date().toISOString()
@@ -121,20 +140,34 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务
+let autoApproveInterval = null;
 async function start() {
   try {
     await initDatabase();
     console.log('✅ 数据库初始化完成');
     
-    autoApproveJokes();
-    setInterval(autoApproveJokes, 3600000);
+    if (!autoApproveInterval) {
+      autoApproveJokes();
+      autoApproveInterval = setInterval(autoApproveJokes, 3600000);
+    }
     
-    app.listen(config.port, () => {
+    const server = app.listen(config.port, () => {
       console.log(`🚀 服务已启动: http://localhost:${config.port}`);
       console.log(`🌍 环境: ${process.env.NODE_ENV || 'development'}`);
       console.log('💕 家庭备忘录，记录爱的每一刻');
       console.log('🔒 API限流已启用');
+      console.log('🛡️ 安全Headers和请求日志已启用');
       console.log('🤖 笑话自动审核已启用（超过1天自动通过）');
+    });
+
+    // Graceful shutdown - 确保端口释放
+    process.on('SIGINT', () => {
+      console.log('收到 SIGINT，优雅关闭...');
+      server.close(() => process.exit(0));
+    });
+    process.on('SIGTERM', () => {
+      console.log('收到 SIGTERM，优雅关闭...');
+      server.close(() => process.exit(0));
     });
   } catch (error) {
     console.error('启动失败:', error);

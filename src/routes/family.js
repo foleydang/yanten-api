@@ -1,11 +1,20 @@
 /**
- * 路由文件: /root/github/yanten-api/src/routes/$f
+ * 家庭管理路由
  */
 const express = require('express');
 const { getDb, generateInviteCode } = require('../utils/database');
 const { authMiddleware } = require('../middleware/auth');
+const config = require('../../config/default');
 
 const router = express.Router();
+
+// 构建 avatar URL 的统一函数
+function buildAvatarUrl(avatar) {
+  if (!avatar) return '';
+  if (avatar.startsWith('cloud://')) return '';
+  if (avatar.startsWith('http')) return avatar;
+  return config.baseUrl + avatar;
+}
 
 // 创建家庭
 router.post('/create', authMiddleware, (req, res) => {
@@ -23,11 +32,10 @@ router.post('/create', authMiddleware, (req, res) => {
     const inviteCode = generateInviteCode();
     
     // 创建家庭
-    db.prepare('INSERT INTO families (name, invite_code, created_by) VALUES (?, ?, ?)').run(name, inviteCode, req.userId);
+    const result = db.prepare('INSERT INTO families (name, invite_code, created_by) VALUES (?, ?, ?)').run(name, inviteCode, req.userId);
     
-    // 获取最后插入的家庭
-    const families = db.prepare('SELECT * FROM families ORDER BY id DESC LIMIT 1').all();
-    const family = families[0];
+    // 用 lastInsertRowid 精确查询，避免并发问题
+    const family = db.prepare('SELECT * FROM families WHERE id = ?').get(result.lastInsertRowid);
     
     if (!family) {
       return res.status(500).json({ success: false, message: '创建失败' });
@@ -136,12 +144,10 @@ router.get('/:familyId', authMiddleware, (req, res) => {
     `).all(familyId);
     
     // 清理失效的 cloud:// URL，构建完整可访问 URL
-    const config = require('../../config/default');
-const baseUrl = config.baseUrl;
     const cleanedMembers = members.map(m => ({
       ...m,
-      avatar: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar && m.avatar.startsWith('http') ? m.avatar : (m.avatar ? baseUrl + m.avatar : '')),
-      avatarUrl: m.avatar && m.avatar.startsWith('cloud://') ? '' : (m.avatar && m.avatar.startsWith('http') ? m.avatar : (m.avatar ? baseUrl + m.avatar : ''))
+      avatar: buildAvatarUrl(m.avatar),
+      avatarUrl: buildAvatarUrl(m.avatar)
     }));
 
     res.json({

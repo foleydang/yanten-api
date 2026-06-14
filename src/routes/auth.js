@@ -2,7 +2,6 @@
  * 用户认证 - 微信登录/注册/个人信息
  */
 const config = require('../../config/default');
-const baseUrl = config.baseUrl;
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
@@ -10,6 +9,14 @@ const { getDb } = require('../utils/database');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
+
+// 构建 avatar URL 的统一函数
+function buildAvatarUrl(avatar) {
+  if (!avatar) return '';
+  if (avatar.startsWith('cloud://')) return '';
+  if (avatar.startsWith('http')) return avatar;
+  return config.baseUrl + avatar;
+}
 
 // 微信登录
 router.post('/login', async (req, res) => {
@@ -35,41 +42,28 @@ router.post('/login', async (req, res) => {
     
     const { openid, session_key, errcode, errmsg } = wxRes.data;
     
+    console.log('🔐 微信登录 openid:', openid, 'errcode:', errcode);
+    
     if (errcode) {
       console.error('微信登录失败:', errmsg);
-      // 开发模式：使用固定模拟 openid，避免每次创建新用户
-      const mockOpenid = 'dev_foley_test';
-      return handleLogin(mockOpenid, res);
+      // 开发模式：生成临时 openid
+      const mockOpenid = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      return handleLogin(mockOpenid, res, true);
     }
     
-    return handleLogin(openid, res);
+    return handleLogin(openid, res, false);
   } catch (error) {
     console.error('登录错误:', error);
-    // 开发模式：允许测试登录
-    const mockOpenid = req.body.testUserId ? ('dev_' + req.body.testUserId) : 'dev_foley_test';
-    return handleLogin(mockOpenid, res);
+    // 开发模式：生成临时 openid（不再硬绑定到 Foley）
+    const mockOpenid = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    return handleLogin(mockOpenid, res, true);
   }
 });
 
 // 处理登录逻辑
-async function handleLogin(openid, res) {
+// isDev: 是否为开发模式登录（不绑定到真实用户，不做数据迁移）
+async function handleLogin(openid, res, isDev) {
   const db = getDb();
-  
-  // 开发模式：dev openid 映射到真实用户（Foley, user 8）
-  if (openid.startsWith('dev_')) {
-    const devUser = db.prepare('SELECT * FROM users WHERE openid = ?').get(openid);
-    if (devUser && devUser.id !== 8) {
-      // 把 dev 用户的数据迁移到 user 8：更新 family_members
-      db.prepare('UPDATE family_members SET user_id = 8 WHERE user_id = ?').run(devUser.id);
-      db.prepare('UPDATE todos SET added_by = 8 WHERE added_by = ?').run(devUser.id);
-      db.prepare('UPDATE schedules SET created_by = 8 WHERE created_by = ?').run(devUser.id);
-      db.prepare('UPDATE shopping_items SET added_by = 8 WHERE added_by = ?').run(devUser.id);
-      // 删除 dev 用户
-      db.prepare('DELETE FROM users WHERE id = ?').run(devUser.id);
-    }
-    // 使用 Foley 的账号登录
-    openid = 'oKMOe5Lr_e2L2oq5VpN8jVwb02Lg';
-  }
   
   // 查找或创建用户
   let user = db.prepare('SELECT * FROM users WHERE openid = ?').get(openid);
@@ -101,9 +95,8 @@ async function handleLogin(openid, res) {
       user: {
         id: user.id,
         nickname: user.nickname,
-        avatar: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar && user.avatar.startsWith('http') ? user.avatar : (user.avatar ? baseUrl + user.avatar : '')),
-        avatarUrl: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar && user.avatar.startsWith('http') ? user.avatar : (user.avatar ? baseUrl + user.avatar : '')),  // 兼容前端
-
+        avatar: buildAvatarUrl(user.avatar),
+        avatarUrl: buildAvatarUrl(user.avatar),  // 兼容前端
         name: user.nickname,
         role: user.role
       }
@@ -125,7 +118,11 @@ router.put('/profile', authMiddleware, (req, res) => {
   
   res.json({
     success: true,
-    data: user,
+    data: {
+      ...user,
+      avatarUrl: buildAvatarUrl(user.avatar),
+      name: user.nickname
+    },
     message: '更新成功'
   });
 });
@@ -157,7 +154,7 @@ router.get('/user', authMiddleware, (req, res) => {
     data: {
       ...user,
       name: user.nickname,
-      avatarUrl: user.avatar && user.avatar.startsWith('cloud://') ? '' : (user.avatar && user.avatar.startsWith('http') ? user.avatar : (user.avatar ? baseUrl + user.avatar : '')),  // 兼容前端
+      avatarUrl: buildAvatarUrl(user.avatar),
       families,
       familyInfo: families[0] || null
     }
@@ -213,5 +210,4 @@ router.get('/stats', authMiddleware, (req, res) => {
   }
 });
 
-// 测试登录（开发环境）
 module.exports = router;
