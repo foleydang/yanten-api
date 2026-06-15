@@ -115,6 +115,24 @@ CREATE TABLE IF NOT EXISTS game_ranks (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 哇哇笑笑话表
+CREATE TABLE IF NOT EXISTS jokes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    likes INTEGER DEFAULT 0,
+    neutrals INTEGER DEFAULT 0,
+    dislikes INTEGER DEFAULT 0,
+    shares INTEGER DEFAULT 0,
+    is_hot INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'approved',
+    date TEXT,
+    created_at INTEGER,
+    source TEXT DEFAULT 'api',
+    submitter TEXT
+);
+
 -- 哇哇笑收藏表
 CREATE TABLE IF NOT EXISTS favorites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,4 +155,8 @@ CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
 CREATE INDEX IF NOT EXISTS idx_game_ranks_game ON game_ranks(game_id);
 CREATE INDEX IF NOT EXISTS idx_game_ranks_score ON game_ranks(game_id, score DESC);
 CREATE INDEX IF NOT EXISTS idx_game_ranks_user ON game_ranks(game_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_jokes_status ON jokes(status);
+CREATE INDEX IF NOT EXISTS idx_jokes_date ON jokes(date);
+CREATE INDEX IF NOT EXISTS idx_jokes_submitter ON jokes(submitter);
 CREATE INDEX IF NOT EXISTS idx_favorites_openid ON favorites(openid);
+CREATE INDEX IF NOT EXISTS idx_favorites_joke ON favorites(joke_id);

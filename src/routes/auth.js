@@ -10,13 +10,7 @@ const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
-// 构建 avatar URL 的统一函数
-function buildAvatarUrl(avatar) {
-  if (!avatar) return '';
-  if (avatar.startsWith('cloud://')) return '';
-  if (avatar.startsWith('http')) return avatar.includes('?') ? avatar : avatar + '?_t=' + Date.now();
-  return config.baseUrl + avatar;
-}
+const { buildAvatarUrl } = require('../utils/avatar');
 
 // 微信登录
 router.post('/login', async (req, res) => {

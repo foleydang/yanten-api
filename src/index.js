@@ -5,7 +5,7 @@ const fs = require('fs');
 require('dotenv').config();
 
 const config = require('../config/default');
-const { initDatabase, getDb } = require('./utils/database');
+const { initDatabase, getDb, shutdownDatabase } = require('./utils/database');
 const { authMiddleware, familyMemberMiddleware } = require('./middleware/auth');
 const { apiLimiter, strictLimiter, jokeLimiter } = require('./middleware/rateLimit');
 const securityHeaders = require('./middleware/securityHeaders');
@@ -160,15 +160,15 @@ async function start() {
       console.log('🤖 笑话自动审核已启用（超过1天自动通过）');
     });
 
-    // Graceful shutdown - 确保端口释放
-    process.on('SIGINT', () => {
-      console.log('收到 SIGINT，优雅关闭...');
+    // Graceful shutdown - 确保数据库保存 + 端口释放
+    function gracefulShutdown(signal) {
+      console.log(`收到 ${signal}，优雅关闭...`);
+      clearInterval(autoApproveInterval);
+      shutdownDatabase(); // 批量保存机制：确保脏数据落盘
       server.close(() => process.exit(0));
-    });
-    process.on('SIGTERM', () => {
-      console.log('收到 SIGTERM，优雅关闭...');
-      server.close(() => process.exit(0));
-    });
+    }
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   } catch (error) {
     console.error('启动失败:', error);
     process.exit(1);

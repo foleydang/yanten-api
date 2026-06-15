@@ -10,39 +10,14 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../utils/database');
 
-let favoritesTableReady = false;
-let submitColumnsReady = false;
-
-function ensureFavoritesTable() {
-  if (favoritesTableReady) return;
-  const db = getDb();
-  try {
-    db.exec(`CREATE TABLE IF NOT EXISTS favorites (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      joke_id INTEGER NOT NULL,
-      openid TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(joke_id, openid)
-    )`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_favorites_openid ON favorites(openid)`);
-    favoritesTableReady = true;
-  } catch (e) {}
-}
-
-function ensureSubmitColumns() {
-  if (submitColumnsReady) return;
-  const db = getDb();
-  try { db.exec('ALTER TABLE jokes ADD COLUMN source TEXT DEFAULT "api"'); } catch (e) {}
-  try { db.exec('ALTER TABLE jokes ADD COLUMN submitter TEXT'); } catch (e) {}
-  submitColumnsReady = true;
-}
+// favorites 表和 jokes 的 source/submitter 列已在 schema.sql 中定义
+// 不再需要运行时 DDL 迁移
 
 // ==================== 收藏 API ====================
 
 // 获取收藏列表
 router.get('/favorites', (req, res) => {
   try {
-    ensureFavoritesTable();
     const db = getDb();
     const { openid, page = 1, limit = 50 } = req.query;
     if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: { list: [], total: 0 } });
@@ -57,7 +32,6 @@ router.get('/favorites', (req, res) => {
 // 添加收藏
 router.post('/favorites/:id', (req, res) => {
   try {
-    ensureFavoritesTable();
     const db = getDb();
     const jokeId = parseInt(req.params.id);
     const { openid } = req.body;
@@ -74,7 +48,6 @@ router.post('/favorites/:id', (req, res) => {
 // 删除收藏
 router.delete('/favorites/:id', (req, res) => {
   try {
-    ensureFavoritesTable();
     const db = getDb();
     const jokeId = parseInt(req.params.id);
     const { openid } = req.query;
@@ -87,7 +60,6 @@ router.delete('/favorites/:id', (req, res) => {
 // 检查是否已收藏（批量）
 router.get('/favorites/check', (req, res) => {
   try {
-    ensureFavoritesTable();
     const db = getDb();
     const { openid, ids } = req.query;
     if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: {} });
@@ -106,7 +78,6 @@ router.get('/favorites/check', (req, res) => {
 // 用户投稿笑话
 router.post('/submit', (req, res) => {
   try {
-    ensureSubmitColumns();
     const db = getDb();
     const { title, content, category, openid } = req.body;
     if (!title || !content) return res.json({ success: false, message: '标题和内容不能为空' });
@@ -137,7 +108,6 @@ router.post('/submit', (req, res) => {
 // 查询我的投稿状态
 router.get('/submit/mine', (req, res) => {
   try {
-    ensureSubmitColumns();
     const db = getDb();
     const { openid } = req.query;
     if (!openid || !isValidOpenid(openid)) return res.json({ success: true, data: { list: [], total: 0 } });
@@ -231,7 +201,6 @@ router.get('/jokes/:id', (req, res) => {
 // 点赞（同时自动收藏）
 router.post('/like/:id', (req, res) => {
   try {
-    ensureFavoritesTable();
     const db = getDb();
     const id = parseInt(req.params.id);
     const { openid } = req.body;

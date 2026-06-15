@@ -18,9 +18,27 @@ const router = express.Router();
 const config = require('../../config/default');
 const { getDb } = require('../utils/database');
 
-// 排行榜缓存
+// 排行榜缓存（定期清理过期条目，防止内存无限增长）
 const rankCache = {};
 const CACHE_TTL = 30000;
+const MAX_CACHE_SIZE = 50;
+
+// 每60秒清理过期缓存
+setInterval(() => {
+  const now = Date.now();
+  const keys = Object.keys(rankCache);
+  keys.forEach(key => {
+    if (now - rankCache[key].time > CACHE_TTL) {
+      delete rankCache[key];
+    }
+  });
+  // 如果缓存条目仍超过上限，淘汰最旧的
+  if (Object.keys(rankCache).length > MAX_CACHE_SIZE) {
+    const entries = Object.entries(rankCache).sort((a, b) => a[1].time - b[1].time);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+    toRemove.forEach(([key]) => delete rankCache[key]);
+  }
+}, 60000);
 
 // ==================== 排行榜 API ====================
 
