@@ -187,15 +187,15 @@ router.get('/month', async (req, res) => {
         dayInfo.termEmoji = '🌿';
       }
       
-      // 固定纪念日（不重复覆盖节假日）
-      if (FIXED_FESTIVALS[mmdd] && !dayInfo.holidayName && !dayInfo.festival) {
+      // 固定纪念日（允许和节假日同时存在）
+      if (FIXED_FESTIVALS[mmdd] && !dayInfo.festival) {
         dayInfo.festival = FIXED_FESTIVALS[mmdd].name;
         dayInfo.festivalEmoji = FIXED_FESTIVALS[mmdd].emoji;
       }
       
-      // 动态节日（母亲节/父亲节/感恩节等）
+      // 动态节日（母亲节/父亲节/感恩节等，允许和节假日同时存在）
       const dynamicFestivals = getDynamicFestivals(y);
-      if (dynamicFestivals[mmdd] && !dayInfo.holidayName && !dayInfo.festival) {
+      if (dynamicFestivals[mmdd] && !dayInfo.festival) {
         dayInfo.festival = dynamicFestivals[mmdd].name;
         dayInfo.festivalEmoji = dynamicFestivals[mmdd].emoji;
       }
