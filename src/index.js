@@ -21,6 +21,8 @@ const feedbackRoutes = require('./routes/feedback');
 const uploadRoutes = require('./routes/upload');
 const adminRoutes = require("./routes/admin");
 const wawaxiaoRoutes = require('./routes/wawaxiao');
+const wishRoutes = require('./routes/wish');
+const holidaysRoutes = require('./routes/holidays');
 const gamesRoutes = require('./routes/games');
 
 const app = express();
@@ -67,9 +69,10 @@ app.use('/api/todo', authMiddleware, todoRoutes);
 app.use('/api/schedule', authMiddleware, scheduleRoutes);
 app.use('/api/feedback', authMiddleware, feedbackRoutes);
 app.use('/api/upload', authMiddleware, uploadRoutes);
-app.use('/api/admin/jokes', adminRoutes);
-app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
+app.use('/api/wish', authMiddleware, wishRoutes);
+app.use('/api/holidays', holidaysRoutes);
 app.use('/api/games', gamesRoutes);
+app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
 
 // 用户统计
 app.get('/api/user/stats', authMiddleware, (req, res) => {
