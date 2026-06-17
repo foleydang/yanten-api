@@ -110,6 +110,45 @@ const FIXED_FESTIVALS = {
   '12-25': { name: '圣诞节', emoji: '🎄' },
 };
 
+// ============ 动态节日（每年日期不同，按规则计算） ============
+
+/**
+ * 计算某年第N个周日/周X的日期
+ * @param {number} year
+ * @param {number} month (1-12)
+ * @param {number} nth 第几个 (1=第一个)
+ * @param {number} weekday 0=周日, 1=周一, ..., 6=周六
+ * @returns {string} MM-DD
+ */
+function nthWeekday(year, month, nth, weekday) {
+  const firstDay = new Date(year, month - 1, 1);
+  const firstWeekday = firstDay.getDay();
+  const offset = (weekday - firstWeekday + 7) % 7;
+  const day = 1 + offset + (nth - 1) * 7;
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * 获取某年的动态节日列表
+ */
+function getDynamicFestivals(year) {
+  const festivals = {};
+  
+  // 母亲节：5月第2个周日
+  const motherDay = nthWeekday(year, 5, 2, 0);
+  festivals[motherDay] = { name: '母亲节', emoji: '💐' };
+  
+  // 父亲节：6月第3个周日
+  const fatherDay = nthWeekday(year, 6, 3, 0);
+  festivals[fatherDay] = { name: '父亲节', emoji: '👨' };
+  
+  // 感恩节：11月第4个周四
+  const thanksgiving = nthWeekday(year, 11, 4, 4);
+  festivals[thanksgiving] = { name: '感恩节', emoji: '🦃' };
+  
+  return festivals;
+}
+
 // ============ API 接口 ============
 
 // 获取某月的节假日+节气+节日信息
@@ -149,9 +188,16 @@ router.get('/month', async (req, res) => {
       }
       
       // 固定纪念日（不重复覆盖节假日）
-      if (FIXED_FESTIVALS[mmdd] && !dayInfo.holidayName) {
+      if (FIXED_FESTIVALS[mmdd] && !dayInfo.holidayName && !dayInfo.festival) {
         dayInfo.festival = FIXED_FESTIVALS[mmdd].name;
         dayInfo.festivalEmoji = FIXED_FESTIVALS[mmdd].emoji;
+      }
+      
+      // 动态节日（母亲节/父亲节/感恩节等）
+      const dynamicFestivals = getDynamicFestivals(y);
+      if (dynamicFestivals[mmdd] && !dayInfo.holidayName && !dayInfo.festival) {
+        dayInfo.festival = dynamicFestivals[mmdd].name;
+        dayInfo.festivalEmoji = dynamicFestivals[mmdd].emoji;
       }
       
       if (Object.keys(dayInfo).length > 0) {
