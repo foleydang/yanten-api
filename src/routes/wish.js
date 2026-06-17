@@ -124,11 +124,11 @@ router.put('/:id/fulfill', authMiddleware, (req, res) => {
   
   try {
     const newStatus = wish.status === 'fulfilled' ? 'pending' : 'fulfilled';
-    const fulfilledAt = newStatus === 'fulfilled' ? "datetime('now')" : 'NULL';
-    const fulfilledBy = newStatus === 'fulfilled' ? req.userId : 'NULL';
+    const fulfilledAt = newStatus === 'fulfilled' ? new Date().toISOString() : null;
+    const fulfilledBy = newStatus === 'fulfilled' ? req.userId : null;
     
-    db.prepare(`UPDATE wishes SET status = ?, fulfilled_at = ${fulfilledAt}, fulfilled_by = ${fulfilledBy} WHERE id = ?`)
-      .run(newStatus, id);
+    db.prepare('UPDATE wishes SET status = ?, fulfilled_at = ?, fulfilled_by = ? WHERE id = ?')
+      .run(newStatus, fulfilledAt, fulfilledBy, id);
     
     res.json({ success: true, message: newStatus === 'fulfilled' ? '心愿已实现！🎉' : '已取消实现' });
   } catch (error) {

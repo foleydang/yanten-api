@@ -58,12 +58,12 @@ const SOLAR_TERMS = {
 
 // ============ 法定节假日（从 timor.tech 同步） ============
 
-let holidayCache = {};
-let holidayCacheTime = {};
+let holidayCache = {}; // { year: { data, expire } }
 
 async function fetchHolidays(year) {
-  if (holidayCache[year] && Date.now() - holidayCacheTime[year] < 86400000) {
-    return holidayCache[year];
+  const cached = holidayCache[year];
+  if (cached && cached.expire > Date.now()) {
+    return cached.data;
   }
   
   try {
@@ -81,8 +81,7 @@ async function fetchHolidays(year) {
     });
     
     if (data.code === 0 && data.holiday) {
-      holidayCache[year] = data.holiday;
-      holidayCacheTime[year] = Date.now();
+      holidayCache[year] = { data: data.holiday, expire: new Date(year, 11, 31, 23, 59, 59).getTime() };
       return data.holiday;
     }
   } catch (err) {
