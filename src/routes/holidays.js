@@ -8,6 +8,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { Solar } = require('lunar-javascript');
 
 // ============ 24节气精确日期表（天文台实测数据） ============
 // 每年24个节气，小寒→冬至，按月份排列
@@ -131,21 +132,33 @@ function nthWeekday(year, month, nth, weekday) {
 /**
  * 获取某年的动态节日列表
  */
+function getLunarFestivals(year) {
+  const { Lunar } = require('lunar-javascript');
+  const result = {};
+  const lunarDays = {
+    '七夕': { month: 7, day: 7, emoji: '💕' },
+    '重阳': { month: 9, day: 9, emoji: '🫶' },
+  };
+  
+  Object.entries(lunarDays).forEach(([name, info]) => {
+    try {
+      const lunar = Lunar.fromYmd(year, info.month, info.day);
+      const solar = lunar.getSolar();
+      const mmdd = `${String(solar.getMonth()).padStart(2, '0')}-${String(solar.getDay()).padStart(2, '0')}`;
+      result[mmdd] = { name, emoji: info.emoji };
+    } catch (e) {}
+  });
+  return result;
+}
+
 function getDynamicFestivals(year) {
   const festivals = {};
-  
-  // 母亲节：5月第2个周日
   const motherDay = nthWeekday(year, 5, 2, 0);
   festivals[motherDay] = { name: '母亲节', emoji: '💐' };
-  
-  // 父亲节：6月第3个周日
   const fatherDay = nthWeekday(year, 6, 3, 0);
   festivals[fatherDay] = { name: '父亲节', emoji: '👨' };
-  
-  // 感恩节：11月第4个周四
   const thanksgiving = nthWeekday(year, 11, 4, 4);
   festivals[thanksgiving] = { name: '感恩节', emoji: '🦃' };
-  
   return festivals;
 }
 
@@ -179,6 +192,23 @@ router.get('/month', async (req, res) => {
         dayInfo.holiday = h.holiday;
         dayInfo.holidayName = h.name;
         dayInfo.wage = h.wage;
+      }
+      
+      // 农历日期
+      try {
+        const solar = Solar.fromYmd(y, m, d);
+        const lunar = solar.getLunar();
+        dayInfo.lunarMonth = lunar.getMonthInChinese();
+        dayInfo.lunarDay = lunar.getDayInChinese();
+      } catch (e) {}
+      
+      // 重要农历节日(不在timor.tech里的)
+      const lunarFestivals = getLunarFestivals(y);
+      if (lunarFestivals[mmdd] && !dayInfo.festival) {
+        // 已有festival优先(如父亲节)
+      } else if (lunarFestivals[mmdd]) {
+        dayInfo.festival = lunarFestivals[mmdd].name;
+        dayInfo.festivalEmoji = lunarFestivals[mmdd].emoji;
       }
       
       // 节气
