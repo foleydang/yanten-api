@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS schedules (
     type TEXT DEFAULT 'other',
     remind_before INTEGER DEFAULT 1,
     repeat_type TEXT DEFAULT 'none',
+    recurring TEXT DEFAULT 'none',
+    recurring_end DATE,
     created_by INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -103,6 +105,21 @@ CREATE TABLE IF NOT EXISTS feedback (
     status TEXT DEFAULT 'pending',
     reply TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 心愿墙表
+CREATE TABLE IF NOT EXISTS wishes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    category TEXT DEFAULT 'other',
+    status TEXT DEFAULT 'pending',
+    priority INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    fulfilled_at TEXT,
+    fulfilled_by INTEGER
 );
 
 -- 小游戏排行榜表（使用 user_id 关联统一用户表，保留 openid 兼容）
