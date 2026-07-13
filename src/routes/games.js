@@ -182,9 +182,7 @@ router.get('/rank/:gameId', (req, res) => {
       rank: index + 1,
       score: row.score,
       nickname: row.nickname || '玩家',
-      avatar: row.avatar && row.avatar.startsWith('http') ? row.avatar : (row.avatar ? baseUrl + row.avatar : ''),
       avatarIndex: row.avatar_index || 0,
-      openid: row.openid,
       date: formatDate(row.created_at)
     }));
 
@@ -274,7 +272,6 @@ router.get('/rank/:gameId/my-best', (req, res) => {
         data: {
           score: result.score,
           nickname: result.nickname || '玩家',
-          avatar: result.avatar && result.avatar.startsWith('http') ? result.avatar : (result.avatar ? baseUrl + result.avatar : ''),
           avatarIndex: result.avatar_index || 0,
           date: formatDate(result.created_at)
         }
