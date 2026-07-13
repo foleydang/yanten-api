@@ -20,6 +20,44 @@ const config = require('../../config/default');
 const { getDb } = require('../utils/database');
 const { getAccessToken } = require('../utils/wechat-token');
 
+// ==================== 登录 API ====================
+
+/**
+ * 微信登录（轻量版，仅返回 openid）
+ * 前端约定: POST /api/games/login { code }
+ * 返回: { success: true, openid: "真实openid" }
+ * 内部调用微信 jscode2session 换取 openid
+ */
+router.post('/login', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.json({ success: false, message: '缺少 code' });
+    }
+
+    const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${config.wechat.appId}&secret=${config.wechat.appSecret}&js_code=${code}&grant_type=authorization_code`;
+    const resp = await fetch(wxUrl);
+    const data = await resp.json();
+
+    if (data.openid) {
+      // 确保 users 表有记录（不存在则创建）
+      const db = getDb();
+      const existing = db.prepare('SELECT id FROM users WHERE openid = ?').get(data.openid);
+      if (!existing) {
+        db.prepare('INSERT INTO users (openid, nickname, avatar) VALUES (?, ?, ?)').run(data.openid, '玩家', '');
+      }
+      console.log('🎮 小游戏登录 openid:', data.openid);
+      return res.json({ success: true, openid: data.openid });
+    }
+
+    console.warn('jscode2session 失败:', data.errcode, data.errmsg);
+    return res.json({ success: false, message: data.errmsg || '登录失败' });
+  } catch (err) {
+    console.error('games/login 错误:', err.message);
+    return res.json({ success: false, message: '登录服务异常' });
+  }
+});
+
 // multer 用于接收图片上传（imgSecCheck）
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1 * 1024 * 1024 } }); // 1MB
 
