@@ -50,7 +50,10 @@ router.post('/login', async (req, res) => {
       return res.json({ success: false, message: '缺少 code' });
     }
 
-    const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${config.wechat.appId}&secret=${config.wechat.appSecret}&js_code=${code}&grant_type=authorization_code`;
+    // 使用小游戏凭证（appid: wx1529e72999162c2f）
+    const gamesAppId = process.env.WECHAT_GAMES_APP_ID;
+    const gamesAppSecret = process.env.WECHAT_GAMES_APP_SECRET;
+    const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${gamesAppId}&secret=${gamesAppSecret}&js_code=${code}&grant_type=authorization_code`;
     const resp = await fetch(wxUrl);
     const data = await resp.json();
 
@@ -324,7 +327,7 @@ router.post('/security/text-check', async (req, res) => {
 
   // 第二层：微信 msgSecCheck 云端复检
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken('games');
     const wxUrl = `https://api.weixin.qq.com/wxa/msg_sec_check?access_token=${accessToken}`;
 
     // v2 需要 openid + scene；无 openid 时降级用 v1
@@ -375,7 +378,7 @@ router.post('/security/img-check', upload.single('media'), async (req, res) => {
   }
 
   try {
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken('games');
     const wxUrl = `https://api.weixin.qq.com/wxa/img_sec_check?access_token=${accessToken}`;
 
     // 构建 multipart/form-data

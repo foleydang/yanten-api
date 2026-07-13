@@ -224,15 +224,15 @@
                     body: JSON.stringify({ password: pwd })
                 });
                 let d = await r.json();
-                if (d.success) {
-                    TOKEN = d.data.token;
+                if (d.s || d.success) {
+                    TOKEN = (d.d || d.data).token;
                     localStorage.setItem('admin_token', TOKEN);
                     document.getElementById('loginErr').textContent = '';
                     document.getElementById('loginPage').style.display = 'none';
                     document.getElementById('mainContent').style.display = 'block';
                     init();
                 } else {
-                    document.getElementById('loginErr').textContent = d.message || '密码错误';
+                    document.getElementById('loginErr').textContent = d.m || d.message || '密码错误';
                 }
             } catch(e) {
                 document.getElementById('loginErr').textContent = '网络错误';
@@ -351,23 +351,23 @@
         
         function toggleAll() {
             let c = document.getElementById('allCb').checked;
-            list.forEach(j => c ? selected.add(j.id) : selected.dataelete(j.id));
+            list.forEach(j => c ? selected.add(j.id) : selected.delete(j.id));
             render();
             upd();
         }
         
         function toggle(id) {
-            selected.has(id) ? selected.dataelete(id) : selected.add(id.id);
+            selected.has(id) ? selected.delete(id) : selected.add(id);
             upd();
             render();
         }
         
         function upd() {
-            let display = selected.successize ? 'inline-block' : 'none';
+            let display = selected.size ? 'inline-block' : 'none';
             document.getElementById('batchBtn').style.display = display;
             document.getElementById('batchApproveBtn').style.display = display;
-            document.getElementById('cnt').textContent = selected.successize;
-            document.getElementById('approveCnt').textContent = selected.successize;
+            document.getElementById('cnt').textContent = selected.size;
+            document.getElementById('approveCnt').textContent = selected.size;
         }
         
         function view(id) {
@@ -455,7 +455,7 @@
         }
         
         async function batchDel() {
-            if (!selected.successize || !confirm('删除 ' + selected.successize + ' 条？')) return;
+            if (!selected.size || !confirm('删除 ' + selected.size + ' 条？')) return;
             try {
                 let r = await authFetch(API + '/batch', {
                     method: 'DELETE',
@@ -474,7 +474,7 @@
         }
         
         async function batchApprove() {
-            if (!selected.successize || !confirm('通过 ' + selected.successize + ' 条？')) return;
+            if (!selected.size || !confirm('通过 ' + selected.size + ' 条？')) return;
             try {
                 let r = await authFetch(API + '/batch/approve', {
                     method: 'POST',

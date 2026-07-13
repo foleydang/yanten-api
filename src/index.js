@@ -73,6 +73,7 @@ app.use('/api/wish', authMiddleware, wishRoutes);
 app.use('/api/holidays', holidaysRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
+app.use('/api/admin/jokes', adminRoutes);
 
 // 用户统计
 app.get('/api/user/stats', authMiddleware, (req, res) => {

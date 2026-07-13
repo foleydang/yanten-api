@@ -175,12 +175,14 @@ router.get('/jokes', (req, res) => {
   try {
     const db = getDb();
     const { category, page = 1, limit = 20 } = req.query;
-    const total = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved"').get()?.count || 0;
     const categoryCounts = db.prepare('SELECT category, COUNT(*) as count FROM jokes WHERE status="approved" GROUP BY category ORDER BY COUNT(*) DESC').all();
-    let list;
+    const allTotal = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved"').get()?.count || 0;
+    let list, total;
     if (category && category !== '全部') {
+      total = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved" AND category=?').get(category)?.count || 0;
       list = db.prepare('SELECT id, title, content, category, likes, shares FROM jokes WHERE status="approved" AND category=? ORDER BY id DESC LIMIT ? OFFSET ?').all(category, parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
     } else {
+      total = allTotal;
       list = db.prepare('SELECT id, title, content, category, likes, shares FROM jokes WHERE status="approved" ORDER BY id DESC LIMIT ? OFFSET ?').all(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
     }
     res.json({ success: true, data: { list: list.map(row => ({ id: row.id, title: row.title, content: row.content, category: row.category || '搞笑', likes: row.likes || 0, shares: row.shares || 0 })), total, categories: ['全部', ...categoryCounts.map(c => c.category)], categoryCounts, page: parseInt(page), limit: parseInt(limit) } });
