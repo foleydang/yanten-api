@@ -343,13 +343,16 @@ router.post('/security/text-check', async (req, res) => {
     const data = await resp.json();
 
     if (data.errcode === 0) {
-      // v2 返回 detail 数组，检查是否有 suggest=review/risk
-      if (data.detail && Array.isArray(data.detail)) {
-        const hasRisk = data.detail.some(d => d.suggest === 'risk' || d.suggest === 'review');
-        return res.json({ success: true, pass: !hasRisk });
+      // v2 返回 detail 数组和 result，检查是否有 suggest=risky/review
+      let hasRisk = false;
+      if (data.result && (data.result.suggest === 'risky' || data.result.suggest === 'review')) {
+        hasRisk = true;
       }
-      // v1 无 detail，errcode=0 即通过
-      return res.json({ success: true, pass: true });
+      if (data.detail && Array.isArray(data.detail)) {
+        hasRisk = hasRisk || data.detail.some(d => d.suggest === 'risky' || d.suggest === 'review');
+      }
+      console.log(hasRisk ? '🚫 内容违规' : '✅ 内容安全');
+      return res.json({ success: true, pass: !hasRisk });
     }
 
     // errcode=87014 表示内容违规
