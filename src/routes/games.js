@@ -20,6 +20,21 @@ const config = require('../../config/default');
 const { getDb } = require('../utils/database');
 const { getAccessToken } = require('../utils/wechat-token');
 
+// ==================== 本地敏感词兜底 ====================
+const SENSITIVE_WORDS = [
+  '色情', '裸聊', '一夜情', '嫖娼', 'av女优', '成人电影', '做爱', '性交易',
+  '赌博', '博彩', '赌场', '六合彩', '时时彩', '押注', '老虎机', '百家乐',
+  '毒品', '冰毒', '大麻', '枪支', '办证', '发票代开', '洗钱', '传销',
+  '诈骗', '刷单', '外挂', '私服',
+  '傻逼', '傻B', '操你', '草泥马', 'nmsl', '狗娘养',
+];
+
+function containsSensitive(text) {
+  if (!text || typeof text !== 'string') return false;
+  const normalized = text.replace(/\s+/g, '');
+  return SENSITIVE_WORDS.some(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(normalized));
+}
+
 // ==================== 登录 API ====================
 
 /**
@@ -82,6 +97,57 @@ setInterval(() => {
     toRemove.forEach(([key]) => delete rankCache[key]);
   }
 }, 60000);
+
+// ==================== 用户 API ====================
+
+// 获取用户信息
+router.get('/user/:openid', (req, res) => {
+  try {
+    const { openid } = req.params;
+    if (!openid || !isValidOpenid(openid)) {
+      return res.json({ success: false, message: '无效 openid' });
+    }
+    const db = getDb();
+    const user = db.prepare('SELECT nickname, avatar_index, avatar FROM users WHERE openid = ?').get(openid);
+    if (user) {
+      res.json({ success: true, data: { nickname: user.nickname || '玩家', avatarIndex: user.avatar_index || 0, avatar: user.avatar || '' } });
+    } else {
+      res.json({ success: true, data: null });
+    }
+  } catch (e) {
+    console.error('获取用户信息失败:', e);
+    res.json({ success: false, message: e.message });
+  }
+});
+
+// 更新用户信息（昵称、头像索引）
+router.post('/user', (req, res) => {
+  try {
+    const { openid, nickname, avatarIndex } = req.body;
+    if (!openid || !isValidOpenid(openid)) {
+      return res.json({ success: false, message: '无效 openid' });
+    }
+
+    // 后端兜底：违规昵称不写入数据库
+    const safeNickname = containsSensitive(nickname) ? '玩家' : (nickname || '玩家');
+
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM users WHERE openid = ?').get(openid);
+    if (existing) {
+      db.prepare('UPDATE users SET nickname = ?, avatar_index = ?, updated_at = datetime("now", "localtime") WHERE openid = ?').run(safeNickname, avatarIndex || 0, openid);
+    } else {
+      db.prepare('INSERT INTO users (openid, nickname, avatar_index, avatar) VALUES (?, ?, ?, ?)').run(openid, safeNickname, avatarIndex || 0, '');
+    }
+
+    // 清除排行榜缓存（昵称变了，排行榜展示也要更新）
+    Object.keys(rankCache).forEach(key => delete rankCache[key]);
+
+    res.json({ success: true, data: { nickname: safeNickname, avatarIndex: avatarIndex || 0 } });
+  } catch (e) {
+    console.error('更新用户信息失败:', e);
+    res.json({ success: false, message: e.message });
+  }
+});
 
 // ==================== 排行榜 API ====================
 
@@ -238,21 +304,6 @@ router.get('/stats', (req, res) => {
 });
 
 // ==================== 内容安全 API ====================
-
-// 本地敏感词兜底（与前端一致，后端再拦一道）
-const SENSITIVE_WORDS = [
-  '色情', '裸聊', '一夜情', '嫖娼', 'av女优', '成人电影', '做爱', '性交易',
-  '赌博', '博彩', '赌场', '六合彩', '时时彩', '押注', '老虎机', '百家乐',
-  '毒品', '冰毒', '大麻', '枪支', '办证', '发票代开', '洗钱', '传销',
-  '诈骗', '刷单', '外挂', '私服',
-  '傻逼', '傻B', '操你', '草泥马', 'nmsl', '狗娘养',
-];
-
-function containsSensitive(text) {
-  if (!text || typeof text !== 'string') return false;
-  const normalized = text.replace(/\s+/g, '');
-  return SENSITIVE_WORDS.some(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(normalized));
-}
 
 /**
  * 文本安全检查 — 调用微信 msgSecCheck
