@@ -15,8 +15,13 @@ function isValidOpenid(openid) {
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const config = require('../../config/default');
 const { getDb } = require('../utils/database');
+const { getAccessToken } = require('../utils/wechat-token');
+
+// multer 用于接收图片上传（imgSecCheck）
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1 * 1024 * 1024 } }); // 1MB
 
 // 排行榜缓存（定期清理过期条目，防止内存无限增长）
 const rankCache = {};
@@ -191,6 +196,125 @@ router.get('/stats', (req, res) => {
   } catch (e) {
     console.error('获取统计失败:', e);
     res.json({ success: false, message: e.message });
+  }
+});
+
+// ==================== 内容安全 API ====================
+
+// 本地敏感词兜底（与前端一致，后端再拦一道）
+const SENSITIVE_WORDS = [
+  '色情', '裸聊', '一夜情', '嫖娼', 'av女优', '成人电影', '做爱', '性交易',
+  '赌博', '博彩', '赌场', '六合彩', '时时彩', '押注', '老虎机', '百家乐',
+  '毒品', '冰毒', '大麻', '枪支', '办证', '发票代开', '洗钱', '传销',
+  '诈骗', '刷单', '外挂', '私服',
+  '傻逼', '傻B', '操你', '草泥马', 'nmsl', '狗娘养',
+];
+
+function containsSensitive(text) {
+  if (!text || typeof text !== 'string') return false;
+  const normalized = text.replace(/\s+/g, '');
+  return SENSITIVE_WORDS.some(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(normalized));
+}
+
+/**
+ * 文本安全检查 — 调用微信 msgSecCheck
+ * 前端约定: POST /api/games/security/text-check { content, openid? }
+ * 返回: { success: true, pass: true|false }
+ */
+router.post('/security/text-check', async (req, res) => {
+  const { content, openid } = req.body;
+
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    return res.json({ success: true, pass: true });
+  }
+  if (content.length > 500) {
+    return res.json({ success: true, pass: false, reason: 'content too long' });
+  }
+
+  // 第一层：本地敏感词即时拦截
+  if (containsSensitive(content)) {
+    return res.json({ success: true, pass: false, reason: 'local' });
+  }
+
+  // 第二层：微信 msgSecCheck 云端复检
+  try {
+    const accessToken = await getAccessToken();
+    const wxUrl = `https://api.weixin.qq.com/wxa/msg_sec_check?access_token=${accessToken}`;
+
+    // v2 需要 openid + scene；无 openid 时降级用 v1
+    const body = openid && isValidOpenid(openid)
+      ? { version: 2, scene: 1, openid, content }
+      : { content };
+
+    const resp = await fetch(wxUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+
+    if (data.errcode === 0) {
+      // v2 返回 detail 数组，检查是否有 suggest=review/risk
+      if (data.detail && Array.isArray(data.detail)) {
+        const hasRisk = data.detail.some(d => d.suggest === 'risk' || d.suggest === 'review');
+        return res.json({ success: true, pass: !hasRisk });
+      }
+      // v1 无 detail，errcode=0 即通过
+      return res.json({ success: true, pass: true });
+    }
+
+    // errcode=87014 表示内容违规
+    if (data.errcode === 87014) {
+      return res.json({ success: true, pass: false, reason: 'remote' });
+    }
+
+    // 其他错误码（如 access_token 过期、频率限制等）— 不阻断，放行
+    console.warn('msgSecCheck 异常:', data.errcode, data.errmsg);
+    return res.json({ success: true, pass: true });
+  } catch (err) {
+    // 网络错误或 access_token 获取失败 — 不阻断正常使用
+    console.error('text-check 失败:', err.message);
+    return res.json({ success: true, pass: true, fallback: true });
+  }
+});
+
+/**
+ * 图片安全检查 — 调用微信 imgSecCheck（预留）
+ * 前端约定: POST /api/games/security/img-check (multipart, 字段名 media)
+ * 返回: { success: true, pass: true|false }
+ */
+router.post('/security/img-check', upload.single('media'), async (req, res) => {
+  if (!req.file) {
+    return res.json({ success: false, message: '缺少图片文件' });
+  }
+
+  try {
+    const accessToken = await getAccessToken();
+    const wxUrl = `https://api.weixin.qq.com/wxa/img_sec_check?access_token=${accessToken}`;
+
+    // 构建 multipart/form-data
+    const formData = new FormData();
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+    formData.append('media', blob, req.file.originalname || 'image.png');
+
+    const resp = await fetch(wxUrl, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
+
+    if (data.errcode === 0) {
+      return res.json({ success: true, pass: true });
+    }
+    if (data.errcode === 87014) {
+      return res.json({ success: true, pass: false, reason: 'remote' });
+    }
+
+    console.warn('imgSecCheck 异常:', data.errcode, data.errmsg);
+    return res.json({ success: true, pass: true, fallback: true });
+  } catch (err) {
+    console.error('img-check 失败:', err.message);
+    return res.json({ success: true, pass: true, fallback: true });
   }
 });
 
