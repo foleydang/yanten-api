@@ -170,13 +170,20 @@ router.get('/rank/:gameId', (req, res) => {
     const db = getDb();
     const order = sort === 'asc' ? 'ASC' : 'DESC';
 
+    // 关卡型游戏:同关按耗时升序(快的排前面);无限型:纯分数降序
+    const levelGames = ['match3','breakout','memory','fruit','sheep'];
+    const isLevel = levelGames.includes(gameId);
+    const orderClause = isLevel
+      ? 'ORDER BY r.score DESC, r.time_ms ASC'
+      : `ORDER BY r.score ${order}`;
+
     const results = db.prepare(`
-      SELECT r.id, r.game_id, r.score, r.openid, r.created_at,
+      SELECT r.id, r.game_id, r.score, r.openid, r.time_ms, r.stars, r.created_at,
         u.nickname, u.avatar_index, u.avatar
       FROM game_ranks r
       LEFT JOIN users u ON r.openid = u.openid
       WHERE r.game_id = ? AND r.score > 0
-      ORDER BY r.score ${order}
+      ${orderClause}
       LIMIT ?
     `).all(gameId, limit);
 
@@ -184,6 +191,8 @@ router.get('/rank/:gameId', (req, res) => {
     const data = results.map((row, index) => ({
       rank: index + 1,
       score: row.score,
+      timeMs: row.time_ms || 0,
+      stars: row.stars || 0,
       nickname: row.nickname || '玩家',
       avatarIndex: row.avatar_index || 0,
       date: formatDate(row.created_at)
@@ -201,7 +210,7 @@ router.get('/rank/:gameId', (req, res) => {
 router.post('/rank/:gameId', (req, res) => {
   try {
     const { gameId } = req.params;
-    const { score, openid } = req.body;
+    const { score, openid, timeMs, stars } = req.body;
 
     if (!score || score <= 0) {
       return res.json({ success: false, message: '无效分数' });
@@ -215,9 +224,9 @@ router.post('/rank/:gameId', (req, res) => {
     const nickname = user?.nickname || '玩家';
 
     db.prepare(`
-      INSERT INTO game_ranks (game_id, score, openid, nickname, created_at)
-      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
-    `).run(gameId, score, openid, nickname);
+      INSERT INTO game_ranks (game_id, score, openid, nickname, time_ms, stars, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+    `).run(gameId, score, openid, nickname, timeMs || 0, stars || 0);
 
     // 清除缓存
     Object.keys(rankCache).forEach(key => {

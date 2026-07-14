@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS game_ranks (
     score INTEGER NOT NULL,
     user_id INTEGER,
     openid TEXT,
+    time_ms INTEGER DEFAULT 0,
+    stars INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
