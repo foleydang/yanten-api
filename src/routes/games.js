@@ -170,19 +170,27 @@ router.get('/rank/:gameId', (req, res) => {
     const db = getDb();
     const order = sort === 'asc' ? 'ASC' : 'DESC';
 
-    // 关卡型游戏:同关按耗时升序(快的排前面);无限型:纯分数降序
+    // 关卡型游戏:同关按星级降序→耗时升序;无限型:纯分数降序
+    // 同一玩家只取最佳记录(去重)
     const levelGames = ['match3','breakout','memory','fruit','sheep'];
     const isLevel = levelGames.includes(gameId);
     const orderClause = isLevel
-      ? 'ORDER BY r.score DESC, r.time_ms ASC'
-      : `ORDER BY r.score ${order}`;
+      ? 'ORDER BY best_score DESC, best_stars DESC, best_time ASC'
+      : `ORDER BY best_score ${order}`;
 
     const results = db.prepare(`
-      SELECT r.id, r.game_id, r.score, r.openid, r.time_ms, r.stars, r.created_at,
+      SELECT r.id, r.game_id, r.score AS best_score, r.openid, r.time_ms AS best_time,
+        r.stars AS best_stars, r.created_at,
         u.nickname, u.avatar_index, u.avatar
       FROM game_ranks r
       LEFT JOIN users u ON r.openid = u.openid
       WHERE r.game_id = ? AND r.score > 0
+        AND r.id = (
+          SELECT r2.id FROM game_ranks r2
+          WHERE r2.game_id = r.game_id AND r2.openid = r.openid AND r2.score > 0
+          ${isLevel ? 'ORDER BY r2.score DESC, r2.stars DESC, r2.time_ms ASC' : `ORDER BY r2.score ${order}`}
+          LIMIT 1
+        )
       ${orderClause}
       LIMIT ?
     `).all(gameId, limit);
@@ -190,9 +198,9 @@ router.get('/rank/:gameId', (req, res) => {
     const baseUrl = config.baseUrl;
     const data = results.map((row, index) => ({
       rank: index + 1,
-      score: row.score,
-      timeMs: row.time_ms || 0,
-      stars: row.stars || 0,
+      score: row.best_score,
+      timeMs: row.best_time || 0,
+      stars: row.best_stars || 0,
       nickname: row.nickname || '玩家',
       avatarIndex: row.avatar_index || 0,
       date: formatDate(row.created_at)
