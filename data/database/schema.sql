@@ -179,3 +179,19 @@ CREATE INDEX IF NOT EXISTS idx_jokes_date ON jokes(date);
 CREATE INDEX IF NOT EXISTS idx_jokes_submitter ON jokes(submitter);
 CREATE INDEX IF NOT EXISTS idx_favorites_openid ON favorites(openid);
 CREATE INDEX IF NOT EXISTS idx_favorites_joke ON favorites(joke_id);
+
+-- 家庭记账表
+CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_id INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'expense',
+    amount REAL NOT NULL,
+    category TEXT NOT NULL DEFAULT '其他',
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    payer_id INTEGER NOT NULL,
+    record_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_accounts_family ON accounts(family_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_date ON accounts(record_date);
