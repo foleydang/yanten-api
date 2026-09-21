@@ -195,6 +195,22 @@ function isValidOpenid(openid) {
 
 
 
+// 搜索笑话（服务端搜索全部）
+router.get('/search', (req, res) => {
+  try {
+    const db = getDb();
+    const { q, limit = 50 } = req.query;
+    if (!q || !q.trim()) return res.json({ success: true, data: [] });
+    const keyword = `%${q.trim()}%`;
+    const results = db.prepare(`
+      SELECT id, title, content, category, likes, shares FROM jokes
+      WHERE status='approved' AND (title LIKE ? OR content LIKE ? OR category LIKE ?)
+      ORDER BY likes DESC LIMIT ?
+    `).all(keyword, keyword, keyword, parseInt(limit));
+    res.json({ success: true, data: results.map(r => ({ id: r.id, title: r.title, content: r.content, category: r.category || '搞笑', likes: r.likes || 0, shares: r.shares || 0 })) });
+  } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
 // 查询笑话列表
 router.get('/jokes', (req, res) => {
   try {
