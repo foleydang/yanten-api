@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { getDb, generateInviteCode } = require('../utils/database');
+const { createNotification } = require('../utils/notify');
 const { authMiddleware } = require('../middleware/auth');
 const config = require('../../config/default');
 
@@ -98,6 +99,12 @@ router.post('/join', authMiddleware, (req, res) => {
     db.prepare(
       'INSERT INTO family_members (family_id, user_id, nickname) VALUES (?, ?, ?)'
     ).run(family.id, req.userId, nickname || '新成员');
+    
+    // 通知家庭创建者
+    const joinerName = nickname || '新成员';
+    createNotification(family.id, family.created_by, 'family_join', null, {
+      args: [joinerName]
+    });
     
     res.json({
       success: true,

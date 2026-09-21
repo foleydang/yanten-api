@@ -3,6 +3,7 @@
  */
 const express = require('express');
 const { getDb } = require('../utils/database');
+const { notifyFamily } = require('../utils/notify');
 const { authMiddleware, familyMemberMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
@@ -103,6 +104,12 @@ router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
       LEFT JOIN users u ON s.added_by = u.id
       WHERE s.id = ?
     `).get(result.lastInsertRowid);
+    
+    // 通知家庭成员
+    const creator = db.prepare('SELECT nickname FROM users WHERE id = ?').get(req.userId);
+    notifyFamily(familyId, req.userId, 'shopping_added', result.lastInsertRowid, {
+      args: [title.trim(), creator?.nickname || '成员']
+    });
     
     res.json({
       success: true,
