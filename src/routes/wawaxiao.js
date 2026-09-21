@@ -120,13 +120,46 @@ router.get('/submit/mine', (req, res) => {
 // ==================== 笑话 API ====================
 
 // 获取统计
+// 分类元数据（图标+描述）
+const CATEGORY_META = {
+  '全部': { icon: '😂', desc: '所有笑话' },
+  '生活': { icon: '😄', desc: '日常生活的趣事' },
+  '校园': { icon: '🏫', desc: '老师同学小明的趣事' },
+  '家庭': { icon: '👨‍👩‍👦', desc: '爸妈爷奶的日常' },
+  '动物': { icon: '🐾', desc: '小猫小狗的趣事' },
+};
+
+// 统计 + 分类概览
 router.get('/stats', (req, res) => {
   try {
     const db = getDb();
     const total = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved"').get()?.count || 0;
     const latestDate = db.prepare('SELECT MAX(date) as date FROM jokes WHERE status="approved"').get()?.date || '';
     const todayCount = db.prepare('SELECT COUNT(*) as count FROM jokes WHERE status="approved" AND date = (SELECT MAX(date) FROM jokes)').get()?.count || 0;
-    res.json({ success: true, data: { total, latestDate, todayCount } });
+    const categoryCounts = db.prepare('SELECT category, COUNT(*) as count FROM jokes WHERE status="approved" GROUP BY category ORDER BY COUNT(*) DESC').all();
+    const categories = categoryCounts.map(c => ({
+      name: c.category,
+      count: c.count,
+      icon: CATEGORY_META[c.category]?.icon || '😄',
+      desc: CATEGORY_META[c.category]?.desc || ''
+    }));
+    res.json({ success: true, data: { total, latestDate, todayCount, categories } });
+  } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
+// 按分类随机获取笑话
+router.get('/random', (req, res) => {
+  try {
+    const db = getDb();
+    const { category } = req.query;
+    let joke;
+    if (category && category !== '全部') {
+      joke = db.prepare('SELECT id, title, content, category FROM jokes WHERE status="approved" AND category=? ORDER BY RANDOM() LIMIT 1').get(category);
+    } else {
+      joke = db.prepare('SELECT id, title, content, category FROM jokes WHERE status="approved" ORDER BY RANDOM() LIMIT 1').get();
+    }
+    if (joke) res.json({ success: true, data: { id: joke.id, title: joke.title, content: joke.content, category: joke.category || '日常' } });
+    else res.json({ success: true, data: null });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
@@ -160,15 +193,7 @@ function isValidOpenid(openid) {
   return true;
 }
 
-// 获取随机笑话（使用 ORDER BY RANDOM() 保证均匀分布）
-router.get('/random', (req, res) => {
-  try {
-    const db = getDb();
-    const joke = db.prepare('SELECT id, title, content, category FROM jokes WHERE status="approved" ORDER BY RANDOM() LIMIT 1').get();
-    if (joke) res.json({ success: true, data: { id: joke.id, title: joke.title, content: joke.content, category: joke.category || '搞笑' } });
-    else res.json({ success: true, data: null });
-  } catch (e) { res.json({ success: false, message: e.message }); }
-});
+
 
 // 查询笑话列表
 router.get('/jokes', (req, res) => {

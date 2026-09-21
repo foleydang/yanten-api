@@ -27,14 +27,15 @@ const gamesRoutes = require('./routes/games');
 
 const app = express();
 
-// 自动审核：超过1天的pending笑话自动通过
+// 自动审核：超过1天的pending笑话自动通过（排除不适宜类别）
+const INAPPROPRIATE_CATEGORIES = ['成人', '低俗', '政治', '宗教'];
 function autoApproveJokes() {
   try {
     const db = getDb();
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const result = db.prepare('UPDATE jokes SET status = "approved" WHERE status = "pending" AND date <= ?').run(yesterday);
+    const result = db.prepare('UPDATE jokes SET status = "approved" WHERE status = "pending" AND date <= ? AND category NOT IN (' + INAPPROPRIATE_CATEGORIES.map(() => '?').join(',') + ')').run(yesterday, ...INAPPROPRIATE_CATEGORIES);
     if (result.changes > 0) {
-      console.log(`🤖 自动审核：${result.changes}条笑话已通过（超过1天未审核）`);
+      console.log(`🤖 自动审核：${result.changes}条笑话已通过（超过1天未审核，排除不适宜类别）`);
     }
   } catch (e) {
     console.error('自动审核失败:', e.message);

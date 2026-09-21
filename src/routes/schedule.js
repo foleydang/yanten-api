@@ -115,7 +115,7 @@ router.get('/month/:year/:month', authMiddleware, (req, res) => {
 router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
   const db = getDb();
   // 兼容两种字段名
-  const { familyId, title, description, scheduleDate, scheduleTime, date, time, type, remindBefore, remind, repeatType } = req.body;
+  const { familyId, title, description, scheduleDate, scheduleTime, date, time, type, remindBefore, remind, repeatType, recurringEnd } = req.body;
   const dateValue = scheduleDate || date;
   const timeValue = scheduleTime || time;
   const remindValue = remindBefore || remind || 1;
@@ -129,8 +129,8 @@ router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
   
   try {
     const result = db.prepare(`
-      INSERT INTO schedules (family_id, title, description, schedule_date, schedule_time, type, remind_before, repeat_type, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO schedules (family_id, title, description, schedule_date, schedule_time, type, remind_before, repeat_type, recurring, recurring_end, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       familyId, 
       title.trim(), 
@@ -140,6 +140,8 @@ router.post('/add', authMiddleware, familyMemberMiddleware, (req, res) => {
       type || 'other',
       remindValue,
       repeatType || 'none',
+      repeatType || 'none',
+      recurringEnd || null,
       req.userId
     );
     
@@ -170,7 +172,7 @@ router.put('/:id', authMiddleware, (req, res) => {
   const db = getDb();
   const { id } = req.params;
   // 兼容两种字段名
-  const { title, description, scheduleDate, scheduleTime, date, time, type, remindBefore, remind, repeatType } = req.body;
+  const { title, description, scheduleDate, scheduleTime, date, time, type, remindBefore, remind, repeatType, recurringEnd } = req.body;
   const dateValue = scheduleDate || date;
   const timeValue = scheduleTime || time;
   const remindValue = remindBefore || remind || 1;
@@ -188,7 +190,7 @@ router.put('/:id', authMiddleware, (req, res) => {
   try {
     db.prepare(`
       UPDATE schedules 
-      SET title = ?, description = ?, schedule_date = ?, schedule_time = ?, type = ?, remind_before = ?, repeat_type = ?
+      SET title = ?, description = ?, schedule_date = ?, schedule_time = ?, type = ?, remind_before = ?, repeat_type = ?, recurring = ?, recurring_end = ?
       WHERE id = ?
     `).run(
       title?.trim(),
@@ -198,6 +200,8 @@ router.put('/:id', authMiddleware, (req, res) => {
       type || 'other',
       remindValue,
       repeatType || 'none',
+      repeatType || 'none',
+      recurringEnd || null,
       id
     );
     

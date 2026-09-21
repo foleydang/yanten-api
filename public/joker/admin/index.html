@@ -58,6 +58,7 @@
         .tag { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .tag-approved { background: #dcfce7; color: #166534; }
         .tag-pending { background: #fef3c7; color: #92400e; }
+        .tag-cat { background: #e0e7ff; color: #4338ca; }
         
         .actions { display: flex; gap: 10px; }
         
@@ -265,6 +266,11 @@
             } catch(e) { console.error('stats error', e); }
         }
         
+        // 分类图标映射
+        const CAT_ICONS = {
+            '生活': '😄', '校园': '🏫', '家庭': '👨\u200d👩\u200d👦', '动物': '🐾',
+        };
+        
         async function cats() {
             try {
                 let r = await authFetch(API + '/categories');
@@ -272,7 +278,8 @@
                 if (d.success && d.data) {
                     let sel = document.getElementById('cat');
                     d.data.forEach(c => {
-                        sel.innerHTML += '<option value="' + c.category + '">' + c.category + ' (' + c.count + ')</option>';
+                        let icon = CAT_ICONS[c.category] || '😄';
+                        sel.innerHTML += '<option value="' + c.category + '">' + icon + ' ' + c.category + ' (' + c.count + ')</option>';
                     });
                 }
             } catch(e) { console.error('cats error', e); }
@@ -315,7 +322,7 @@
                 '<tr>' +
                 '<td><input type="checkbox" ' + (selected.has(j.id) ? 'checked' : '') + ' onchange="toggle(' + j.id + ')"></td>' +
                 '<td>' + j.id + '</td>' +
-                '<td>' + (j.category || '搞笑') + '</td>' +
+                '<td><span class="tag tag-cat">' + (CAT_ICONS[j.category] || '😄') + ' ' + (j.category || '日常') + '</span></td>' +
                 '<td>' + esc(j.title) + '</td>' +
                 '<td>' + esc(j.content ? j.content.substring(0, 80) : '') + '...</td>' +
                 '<td><span class="tag tag-' + j.status + '">' + (j.status === 'approved' ? '已审核' : '待审核') + '</span></td>' +
