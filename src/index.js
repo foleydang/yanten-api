@@ -24,6 +24,7 @@ const wawaxiaoRoutes = require('./routes/wawaxiao');
 const wishRoutes = require('./routes/wish');
 const accountRoutes = require('./routes/account');
 const notificationRoutes = require('./routes/notification');
+const searchRoutes = require('./routes/search');
 const holidaysRoutes = require('./routes/holidays');
 const gamesRoutes = require('./routes/games');
 
@@ -75,6 +76,7 @@ app.use('/api/upload', authMiddleware, uploadRoutes);
 app.use('/api/wish', authMiddleware, wishRoutes);
 app.use('/api/account', authMiddleware, accountRoutes);
 app.use('/api/notification', authMiddleware, notificationRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/holidays', holidaysRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/wawaxiao', jokeLimiter, wawaxiaoRoutes);
