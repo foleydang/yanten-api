@@ -177,6 +177,8 @@ router.get('/month', async (req, res) => {
   try {
     const holidays = await fetchHolidays(y);
     const solarTerms = SOLAR_TERMS[y] || {};
+    const lunarFestivals = getLunarFestivals(y);
+    const dynamicFestivals = getDynamicFestivals(y);
     
     const daysInMonth = new Date(y, m, 0).getDate();
     const result = {};
@@ -203,10 +205,7 @@ router.get('/month', async (req, res) => {
       } catch (e) {}
       
       // 重要农历节日(不在timor.tech里的)
-      const lunarFestivals = getLunarFestivals(y);
       if (lunarFestivals[mmdd] && !dayInfo.festival) {
-        // 已有festival优先(如父亲节)
-      } else if (lunarFestivals[mmdd]) {
         dayInfo.festival = lunarFestivals[mmdd].name;
         dayInfo.festivalEmoji = lunarFestivals[mmdd].emoji;
       }
@@ -224,7 +223,6 @@ router.get('/month', async (req, res) => {
       }
       
       // 动态节日（母亲节/父亲节/感恩节等，允许和节假日同时存在）
-      const dynamicFestivals = getDynamicFestivals(y);
       if (dynamicFestivals[mmdd] && !dayInfo.festival) {
         dayInfo.festival = dynamicFestivals[mmdd].name;
         dayInfo.festivalEmoji = dynamicFestivals[mmdd].emoji;

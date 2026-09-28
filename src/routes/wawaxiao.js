@@ -9,9 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../utils/database');
-
-// favorites 表和 jokes 的 source/submitter 列已在 schema.sql 中定义
-// 不再需要运行时 DDL 迁移
+const { isValidOpenid } = require('../utils/validate');
 
 // ==================== 收藏 API ====================
 
@@ -183,19 +181,6 @@ router.get('/latest', (req, res) => {
     res.json({ success: true, data: results.map(row => ({ id: row.id, title: row.title, content: row.content, category: row.category || '搞笑' })) });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
-
-// openid 合法性校验（防止 SQL注入等恶意输入）
-function isValidOpenid(openid) {
-  if (!openid) return false;
-  // 合法 openid 格式：微信 oKMOe5* 开头，或开发测试 dev_/wx_/user_ 开头
-  // 不允许包含 SQL关键词、特殊字符、超长字符串
-  if (openid.length > 100) return false;
-  if (/[;'"\-\-\/\*\n\r]/.test(openid)) return false;
-  if (/union|select|insert|delete|drop|sleep|jndi|ldap|rmi/i.test(openid)) return false;
-  return true;
-}
-
-
 
 // 搜索笑话（服务端搜索全部）
 router.get('/search', (req, res) => {

@@ -4,21 +4,13 @@
  * - 排行榜提交只需 openid，昵称从 users 表自动获取
  * - 支持排行榜查询、成绩提交、最佳成绩查询
  */
-// openid 合法性校验
-function isValidOpenid(openid) {
-  if (!openid) return false;
-  if (openid.length > 100) return false;
-  if (/[;'"\-\-\/\*\n\r]/.test(openid)) return false;
-  if (/union|select|insert|delete|drop|sleep|jndi|ldap|rmi/i.test(openid)) return false;
-  return true;
-}
-
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const config = require('../../config/default');
 const { getDb } = require('../utils/database');
 const { getAccessToken } = require('../utils/wechat-token');
+const { isValidOpenid } = require('../utils/validate');
 
 // ==================== 本地敏感词兜底 ====================
 const SENSITIVE_WORDS = [
@@ -242,10 +234,15 @@ router.post('/rank/:gameId', (req, res) => {
     });
 
     const sort = gameId === 'memory' ? 'asc' : 'desc';
+    const isLevel = ['match3','breakout','memory','fruit','sheep'].includes(gameId);
+    // 去重：同一玩家只算最佳成绩，和排行榜展示逻辑一致
     const rankResult = db.prepare(`
-      SELECT COUNT(*) + 1 as rank
-      FROM game_ranks
-      WHERE game_id = ? AND score > 0 AND score ${sort === 'asc' ? '<' : '>'} ?
+      SELECT COUNT(*) + 1 as rank FROM (
+        SELECT r2.openid, ${isLevel ? 'MAX(r2.score) as best_score' : `${sort === 'asc' ? 'MIN' : 'MAX'}(r2.score) as best_score`}
+        FROM game_ranks r2
+        WHERE r2.game_id = ? AND r2.score > 0
+        GROUP BY r2.openid
+      ) WHERE best_score ${sort === 'asc' ? '<' : '>'} ?
     `).get(gameId, score);
 
     res.json({
